@@ -1,15 +1,5 @@
 """
 GOLPREDICTOR 2026 — Sala de análisis predictivo del Mundial.
-
-Dashboard que:
-  - Lista todos los partidos ordenados por fecha (scroll).
-  - Muestra para cada uno: Predicción 1 (óptima por valor esperado) + % ,
-    Predicción 2 (alternativa) + %, probabilidades 1X2, y el marcador real
-    (autollenado desde API deportiva, con respaldo de scraping).
-  - Compara predicho vs real cuando el partido termina, con desglose de puntos.
-  - Incluye un chatbot al pie para preguntar / dar contexto (human in the loop).
-
-Ejecutar:  streamlit run app.py
 """
 
 from __future__ import annotations
@@ -21,20 +11,19 @@ import streamlit as st
 
 from core.fixture import cargar_fixture, fixture_desde_api, guardar_fixture, GRUPOS
 from core.predictor import PoissonPredictor, Reglas, FuerzaEquipo
-from core.inteligencia import analizar_partido, buscar_contexto_tavily, responder_chat
+from core.inteligencia import (
+    analizar_partido_completo, buscar_contexto_tavily, responder_chat
+)
 from core.resultados import obtener_resultado_real
 from core.analisis import analizar_resultado
+from core.equipos import get_fuerza, razonamiento_fuerza
 from core import almacen
 
 
-# ---------------------------------------------------------------------------
-# Configuración y secretos
-# ---------------------------------------------------------------------------
 st.set_page_config(page_title="Golpredictor 2026", page_icon="⚽", layout="wide")
 
 
 def secreto(nombre: str) -> str:
-    """Lee de st.secrets primero, luego de variables de entorno."""
     try:
         if nombre in st.secrets:
             return st.secrets[nombre]
@@ -46,15 +35,11 @@ def secreto(nombre: str) -> str:
 KEYS = {
     "apifootball": secreto("APIFOOTBALL_KEY"),
     "footballdata": secreto("FOOTBALLDATA_KEY"),
-    "tavily": secreto("TAVILY_API_KEY"),
-    "serper": secreto("SERPER_API_KEY"),
-    "gemini": secreto("GEMINI_API_KEY"),
+    "tavily":       secreto("TAVILY_API_KEY"),
+    "serper":       secreto("SERPER_API_KEY"),
+    "gemini":       secreto("GEMINI_API_KEY"),
 }
 
-
-# ---------------------------------------------------------------------------
-# Estilo (identidad visual: sala táctica — verde césped sobre pizarra)
-# ---------------------------------------------------------------------------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
@@ -65,26 +50,21 @@ h1, h2, h3 { font-family: 'Barlow Condensed', sans-serif !important; letter-spac
   color: #3ddc84; text-transform: uppercase; letter-spacing: 2px;
   border-bottom: 1px solid #2a3340; padding: 14px 0 6px; margin-top: 18px;
 }
-.tarjeta {
-  background: #161c24; border: 1px solid #232c38; border-radius: 10px;
-  padding: 16px 18px; margin: 10px 0;
-}
 .equipos { font-family:'Barlow Condensed',sans-serif; font-size:1.35rem; font-weight:600; color:#eef2f6; }
 .meta { color:#7d8a99; font-size:.8rem; font-family:'Inter',sans-serif; }
 .pred-1 { color:#3ddc84; font-weight:700; font-size:1.5rem; font-family:'Barlow Condensed',sans-serif; }
 .pred-2 { color:#9aa7b4; font-weight:600; font-size:1.15rem; font-family:'Barlow Condensed',sans-serif; }
 .real-pend { color:#5a6776; font-style:italic; }
 .real-ok { color:#ffd25a; font-weight:700; font-size:1.5rem; font-family:'Barlow Condensed',sans-serif; }
-.chip { display:inline-block; padding:2px 9px; border-radius:20px; font-size:.72rem;
-        font-family:'Inter',sans-serif; font-weight:600; }
-.chip-pts { background:#13361f; color:#3ddc84; border:1px solid #1d5230; }
+.chip { display:inline-block; padding:2px 9px; border-radius:20px; font-size:.72rem; font-family:'Inter',sans-serif; font-weight:600; }
+.chip-pts  { background:#13361f; color:#3ddc84; border:1px solid #1d5230; }
+.chip-azul { background:#0e2040; color:#6ab4ff; border:1px solid #1a3560; }
+.barra-wrap { background:#1e2a38; border-radius:4px; height:6px; width:100%; }
+.barra-fill { border-radius:4px; height:6px; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------------------------
-# Estado / carga de fixture
-# ---------------------------------------------------------------------------
 @st.cache_data(ttl=3600)
 def _fixture_cacheado(usar_api: bool):
     if usar_api:
@@ -98,56 +78,38 @@ def _es_eliminatoria(partido) -> bool:
     return partido.get("fase", "grupos") == "eliminatorias"
 
 
-# ---------------------------------------------------------------------------
-# Cabecera
-# ---------------------------------------------------------------------------
 st.markdown("# ⚽ GOLPREDICTOR 2026")
 st.markdown(
     "<span class='meta'>Motor predictivo Poisson + IA · optimizado para maximizar "
-    "puntos según las reglas del juego. Las probabilidades son estimaciones, "
-    "no certezas.</span>", unsafe_allow_html=True,
-)
+    "puntos según las reglas del juego.</span>", unsafe_allow_html=True)
 
-# Indicador de estado de APIs (visible al arrancar)
 _keys_ok = [k for k, v in KEYS.items() if v]
 _keys_ko = [k for k, v in KEYS.items() if not v]
-if _keys_ok:
-    st.success(f"✅ APIs activas: {', '.join(_keys_ok)}", icon=None)
-if _keys_ko:
-    st.warning(f"⚠️ Sin configurar (modo degradado): {', '.join(_keys_ko)}")
+col_s1, col_s2 = st.columns(2)
+with col_s1:
+    if _keys_ok:
+        st.success(f"✅ APIs activas: {', '.join(_keys_ok)}")
+with col_s2:
+    if _keys_ko:
+        st.warning(f"⚠️ Sin configurar: {', '.join(_keys_ko)}")
 
-# Aviso honesto de calibración
-with st.expander("¿Cómo funciona y qué esperar? (léelo una vez)"):
+with st.expander("ℹ️ ¿Cómo funciona?"):
     st.markdown("""
-**Esto NO adivina marcadores exactos con certeza** — nadie puede. El marcador exacto
-de un partido de fútbol es de los eventos más difíciles de predecir.
-
-Lo que hace este sistema es **maximizar tu valor esperado de puntos**:
-- Modela los goles de cada equipo con distribuciones de Poisson.
-- Calibra la fuerza de cada equipo con datos reales (API-Football) + contexto web (Tavily) razonado por IA (Gemini).
-- Elige el pronóstico que da **más puntos esperados** según tus reglas (acertar el ganador pesa más que el marcador exacto).
-
-**Predicción 1** = la jugada óptima estadística. **Predicción 2** = alternativa de respaldo.
-El **%** es la probabilidad de que ESE marcador exacto ocurra (suele ser baja: el fútbol es así).
+**Base**: ranking FIFA 2026 → fuerzas de ataque/defensa por equipo (ya diferenciadas).  
+**Ajuste IA**: Tavily busca noticias/lesiones · Gemini calibra con ese contexto (±20% máx).  
+**Optimización**: elige el marcador que maximiza tus puntos esperados según las reglas de Golpredictor.
 """)
 
-col_a, col_b, col_c = st.columns([1, 1, 2])
+col_a, col_b, _ = st.columns([1, 1, 2])
 with col_a:
     usar_api = st.toggle("Fixture desde API-Football", value=bool(KEYS["apifootball"]))
 with col_b:
-    if st.button("🔄 Recalcular predicciones"):
+    if st.button("🔄 Recalcular todo"):
         st.cache_data.clear()
         for k in list(st.session_state.keys()):
             if k.startswith("pred_"):
                 del st.session_state[k]
         st.rerun()
-
-# Estado de las API keys
-faltan = [n for n, v in KEYS.items() if not v]
-if faltan:
-    with col_c:
-        st.warning(f"Faltan keys (modo degradado): {', '.join(faltan)}. "
-                   "Configúralas en Settings → Secrets.", icon="⚠️")
 
 try:
     partidos = _fixture_cacheado(usar_api)
@@ -158,28 +120,22 @@ except Exception as e:
 predictor = PoissonPredictor()
 
 
-# ---------------------------------------------------------------------------
-# Cálculo perezoso de predicción por partido (cacheado en sesión)
-# ---------------------------------------------------------------------------
-def predecir_partido(p):
+def calcular_partido(p: dict) -> dict:
     clave = f"pred_{p['id']}"
     if clave in st.session_state:
         return st.session_state[clave]
-
-    # 1) fuerzas calibradas (usa IA si hay keys; si no, neutrales)
-    fuerzas = analizar_partido(
-        p["local"], p["visitante"], KEYS["tavily"], KEYS["gemini"]
-    )
-    predictor.fuerzas = fuerzas
+    anal = analizar_partido_completo(p["local"], p["visitante"], KEYS["tavily"], KEYS["gemini"])
+    predictor.fuerzas = anal["fuerzas"]
     reglas = Reglas.eliminatorias() if _es_eliminatoria(p) else Reglas.primera_ronda()
     res = predictor.top_dos_pronosticos(p["local"], p["visitante"], reglas)
+    res["razonamiento"] = anal.get("razonamiento", "")
+    res["nota_ia"]      = anal.get("nota_ia", "")
+    res["fuerza_local"]     = anal.get("fuerzas_local", FuerzaEquipo())
+    res["fuerza_visitante"] = anal.get("fuerzas_visitante", FuerzaEquipo())
     st.session_state[clave] = res
     return res
 
 
-# ---------------------------------------------------------------------------
-# Render: agrupar por fecha y mostrar con scroll
-# ---------------------------------------------------------------------------
 por_fecha = defaultdict(list)
 for p in partidos:
     por_fecha[p.get("fecha", "Sin fecha")].append(p)
@@ -196,7 +152,15 @@ def fecha_bonita(iso: str) -> str:
         return iso
 
 
+def _barra(val: float, max_val: float = 2.2, color: str = "#3ddc84") -> str:
+    pct = min(100, int(val / max_val * 100))
+    return (f"<div class='barra-wrap'><div class='barra-fill' "
+            f"style='width:{pct}%;background:{color}'></div></div>")
+
+
 st.markdown("---")
+st.markdown(f"<span class='meta'>{len(partidos)} partidos cargados</span>",
+            unsafe_allow_html=True)
 
 for fecha in sorted(por_fecha.keys()):
     st.markdown(f"<div class='bloque-fecha'>{fecha_bonita(fecha)}</div>",
@@ -204,29 +168,59 @@ for fecha in sorted(por_fecha.keys()):
 
     for p in por_fecha[fecha]:
         guardado = almacen.get_prediccion(p["id"])
+        ya = f"pred_{p['id']}" in st.session_state
+
         with st.container():
             c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
 
-            # --- columna equipos ---
             with c1:
                 grupo = f" · Grupo {p['grupo']}" if p.get("grupo") else ""
-                sede = f" · {p['sede']}" if p.get("sede") else ""
-                fase = "Eliminatoria" if _es_eliminatoria(p) else "Grupos"
+                sede  = f" · {p['sede']}"         if p.get("sede")  else ""
+                fase  = "Eliminatoria" if _es_eliminatoria(p) else "Grupos"
                 st.markdown(
-                    f"<div class='equipos'>{p['local']} <span style='color:#5a6776'>vs</span> "
-                    f"{p['visitante']}</div>"
+                    f"<div class='equipos'>{p['local']} <span style='color:#5a6776'>vs</span> {p['visitante']}</div>"
                     f"<div class='meta'>{fase}{grupo}{sede}</div>",
-                    unsafe_allow_html=True,
-                )
+                    unsafe_allow_html=True)
 
-            # --- predicción (perezosa: botón para calcular) ---
-            ya = f"pred_{p['id']}" in st.session_state
+                fl = (st.session_state[f"pred_{p['id']}"].get("fuerza_local", get_fuerza(p["local"]))
+                      if ya else get_fuerza(p["local"]))
+                fv = (st.session_state[f"pred_{p['id']}"].get("fuerza_visitante", get_fuerza(p["visitante"]))
+                      if ya else get_fuerza(p["visitante"]))
+
+                with st.expander("📊 Análisis de la IA", expanded=False):
+                    if ya:
+                        r = st.session_state[f"pred_{p['id']}"]
+                        if r.get("nota_ia"):
+                            st.markdown(r["nota_ia"])
+                        st.markdown(r.get("razonamiento", ""))
+                    else:
+                        st.markdown(razonamiento_fuerza(p["local"], p["visitante"]))
+
+                    cf1, cf2 = st.columns(2)
+                    with cf1:
+                        st.markdown(f"**{p['local']}**")
+                        st.markdown(f"<span class='meta'>Ataque {fl.ataque:.2f}</span>", unsafe_allow_html=True)
+                        st.markdown(_barra(fl.ataque), unsafe_allow_html=True)
+                        st.markdown(f"<span class='meta'>Defensa {fl.defensa:.2f} "
+                                    f"({'débil' if fl.defensa>1.1 else 'sólida'})</span>", unsafe_allow_html=True)
+                        st.markdown(_barra(fl.defensa, color="#e05a5a"), unsafe_allow_html=True)
+                    with cf2:
+                        st.markdown(f"**{p['visitante']}**")
+                        st.markdown(f"<span class='meta'>Ataque {fv.ataque:.2f}</span>", unsafe_allow_html=True)
+                        st.markdown(_barra(fv.ataque), unsafe_allow_html=True)
+                        st.markdown(f"<span class='meta'>Defensa {fv.defensa:.2f} "
+                                    f"({'débil' if fv.defensa>1.1 else 'sólida'})</span>", unsafe_allow_html=True)
+                        st.markdown(_barra(fv.defensa, color="#e05a5a"), unsafe_allow_html=True)
+
             if not ya:
                 with c2:
-                    if st.button("Calcular", key=f"btn_{p['id']}"):
+                    if st.button("🧠 Calcular", key=f"btn_{p['id']}"):
                         with st.spinner("Analizando..."):
-                            predecir_partido(p)
+                            calcular_partido(p)
                         st.rerun()
+                with c3:
+                    st.markdown("<span class='meta'>Abre '📊 Análisis' para ver<br>las fuerzas base, o pulsa Calcular</span>",
+                                unsafe_allow_html=True)
             else:
                 r = st.session_state[f"pred_{p['id']}"]
                 o1, o2 = r["opcion_1"], r["opcion_2"]
@@ -235,20 +229,18 @@ for fecha in sorted(por_fecha.keys()):
                     st.markdown(
                         f"<div class='pred-1'>{o1['marcador'][0]} – {o1['marcador'][1]}</div>"
                         f"<div class='meta'>Predicción 1 · {o1['prob']*100:.0f}% · "
-                        f"<span class='chip chip-pts'>{o1['pts_esperados']} pts esp.</span></div>",
-                        unsafe_allow_html=True,
-                    )
+                        f"<span class='chip chip-pts'>{o1['pts_esperados']:.1f} pts esp.</span></div>",
+                        unsafe_allow_html=True)
                 with c3:
                     st.markdown(
                         f"<div class='pred-2'>{o2['marcador'][0]} – {o2['marcador'][1]}</div>"
                         f"<div class='meta'>Predicción 2 · {o2['prob']*100:.0f}%</div>"
-                        f"<div class='meta'>1: {pred.prob_victoria_local*100:.0f}% · "
-                        f"X: {pred.prob_empate*100:.0f}% · "
-                        f"2: {pred.prob_victoria_visit*100:.0f}%</div>",
-                        unsafe_allow_html=True,
-                    )
+                        f"<div class='meta'>"
+                        f"<span class='chip chip-azul'>1:{pred.prob_victoria_local*100:.0f}%</span> "
+                        f"<span class='chip chip-azul'>X:{pred.prob_empate*100:.0f}%</span> "
+                        f"<span class='chip chip-azul'>2:{pred.prob_victoria_visit*100:.0f}%</span></div>",
+                        unsafe_allow_html=True)
 
-            # --- marcador real + análisis ---
             with c4:
                 real = guardado.get("real")
                 if real:
@@ -256,43 +248,39 @@ for fecha in sorted(por_fecha.keys()):
                     st.markdown(
                         f"<div class='real-ok'>{rl} – {rv}</div>"
                         f"<div class='meta'>Marcador real</div>",
-                        unsafe_allow_html=True,
-                    )
+                        unsafe_allow_html=True)
                     if ya:
                         an = analizar_resultado(
                             st.session_state[f"pred_{p['id']}"]["opcion_1"]["marcador"],
-                            (rl, rv), _es_eliminatoria(p),
-                        )
+                            (rl, rv), _es_eliminatoria(p))
                         st.markdown(
                             f"<div class='meta'>{an['veredicto']}<br>"
                             f"<span class='chip chip-pts'>{an['puntos']}/{an['max_posible']} pts</span></div>",
-                            unsafe_allow_html=True,
-                        )
+                            unsafe_allow_html=True)
                 else:
-                    st.markdown("<div class='real-pend'>pendiente</div>",
-                                unsafe_allow_html=True)
-                    if st.button("Buscar resultado", key=f"res_{p['id']}"):
+                    st.markdown("<div class='real-pend'>⏳ pendiente</div>", unsafe_allow_html=True)
+                    if st.button("🔍 Buscar resultado", key=f"res_{p['id']}"):
                         with st.spinner("Buscando..."):
-                            r = obtener_resultado_real(
+                            r2 = obtener_resultado_real(
                                 p["local"], p["visitante"], p.get("fecha", ""),
                                 KEYS["apifootball"], KEYS["footballdata"],
-                                KEYS["tavily"], KEYS["serper"],
-                            )
-                        if r:
-                            almacen.set_prediccion(p["id"], {"real": list(r)})
+                                KEYS["tavily"], KEYS["serper"])
+                        if r2:
+                            almacen.set_prediccion(p["id"], {"real": list(r2)})
                             st.rerun()
                         else:
-                            st.toast("Aún no hay resultado confiable. Sigue pendiente.")
+                            st.toast("Áun no hay resultado confiable.")
+
+        st.markdown("<hr style='border:0;border-top:1px solid #1e2a38;margin:4px 0'>",
+                    unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------------------------
-# Chatbot human-in-the-loop
-# ---------------------------------------------------------------------------
 st.markdown("---")
 st.markdown("## 💬 Mesa de análisis")
-st.markdown("<span class='meta'>Pregunta sobre cualquier predicción, o aporta "
-            "contexto (lesiones, clima, intuición) para afinar el modelo.</span>",
-            unsafe_allow_html=True)
+st.markdown(
+    "<span class='meta'>Pregunta sobre cualquier partido, aporta contexto (lesiones, "
+    "noticias) o pide que recalcule con nueva información.</span>",
+    unsafe_allow_html=True)
 
 if "chat" not in st.session_state:
     st.session_state.chat = []
@@ -301,14 +289,12 @@ for msg in st.session_state.chat:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-if entrada := st.chat_input("Escribe aquí..."):
+if entrada := st.chat_input("¿Quién gana Brasil vs Marruecos? / ¿Qué pasa con Messi?"):
     st.session_state.chat.append({"role": "user", "content": entrada})
     with st.chat_message("user"):
         st.markdown(entrada)
-
-    # contexto web opcional + respuesta de Gemini
     with st.chat_message("assistant"):
-        with st.spinner("Pensando..."):
+        with st.spinner("Analizando..."):
             ctx = buscar_contexto_tavily(entrada, KEYS["tavily"], max_resultados=4)
             respuesta = responder_chat(entrada, ctx, KEYS["gemini"])
         st.markdown(respuesta)
