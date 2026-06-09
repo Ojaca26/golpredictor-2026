@@ -33,6 +33,7 @@ EQUIPOS = {
     "Suiza":            FuerzaEquipo(ataque=1.42, defensa=0.92),
     "Austria":          FuerzaEquipo(ataque=1.38, defensa=1.00),
     "Escocia":          FuerzaEquipo(ataque=1.30, defensa=1.05),
+    "Suecia":           FuerzaEquipo(ataque=1.30, defensa=1.05),
     "Turquía":          FuerzaEquipo(ataque=1.25, defensa=1.10),
     "Polonia":          FuerzaEquipo(ataque=1.22, defensa=1.12),
     "Serbia":           FuerzaEquipo(ataque=1.20, defensa=1.10),
@@ -87,6 +88,8 @@ EQUIPOS = {
     "Sudáfrica":        FuerzaEquipo(ataque=0.95, defensa=1.25),
     "Mali":             FuerzaEquipo(ataque=1.05, defensa=1.20),
     "Burkina Faso":     FuerzaEquipo(ataque=1.00, defensa=1.25),
+    "Cabo Verde":       FuerzaEquipo(ataque=0.90, defensa=1.30),
+    "RD Congo":         FuerzaEquipo(ataque=0.88, defensa=1.35),
     # OFC
     "Nueva Zelanda":    FuerzaEquipo(ataque=0.95, defensa=1.30),
 }
@@ -170,6 +173,11 @@ EN_A_ES = {
     "North Macedonia": "Macedonia del Norte",
     "Montenegro": "Montenegro",
     "Kosovo": "Kosovo",
+    "Cape Verde": "Cabo Verde",
+    "DR Congo": "RD Congo",
+    "Congo DR": "RD Congo",
+    "Democratic Republic of Congo": "RD Congo",
+    "Democratic Republic Congo": "RD Congo",
 }
 
 
