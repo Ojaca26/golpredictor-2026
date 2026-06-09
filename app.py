@@ -6,7 +6,7 @@ Dashboard que:
   - Muestra para cada uno: Prediccion 1 (optima por valor esperado) + %,
     Prediccion 2 (alternativa) + %, probabilidades 1X2, marcador real y analisis IA.
   - Mapa de calor de probabilidades por marcador (Dixon-Coles).
-  - Simulacion Monte Carlo del torneo completo.
+  - Simulacion Monte Carlo del torneo completo (10k simulaciones por defecto).
   - Chatbot al pie para preguntar / dar contexto (human in the loop).
 
 Ejecutar:  streamlit run app.py
@@ -123,11 +123,11 @@ with col_s2:
 with st.expander("Como funciona?"):
     st.markdown("""
 **Base**: ranking FIFA 2026 -> fuerzas de ataque/defensa por equipo.
-**Modelo**: Poisson bivariado con correccion Dixon-Coles (corrige marcadores bajos).
+**Modelo**: Poisson bivariado con correccion Dixon-Coles (corrige marcadores bajos 0-0, 1-0, 0-1, 1-1).
 **Ajuste IA**: Tavily busca noticias/lesiones, Gemini calibra con ese contexto (+-20% max).
 **Optimizacion**: elige el marcador que maximiza puntos esperados segun las reglas de Golpredictor.
 **Mapa de calor**: tabla de probabilidades para cada marcador posible (0-5 por lado).
-**Monte Carlo**: simula el torneo completo miles de veces para calcular probabilidades de clasificacion.
+**Monte Carlo**: simula el torneo 10.000 veces para calcular probabilidades de clasificacion y campeonato.
 """)
 
 col_a, col_b, col_c = st.columns([1, 1, 2])
@@ -245,10 +245,10 @@ def _heatmap_html(M, local: str, visitante: str, max_g: int = 5) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Seccion Monte Carlo
+# Seccion Monte Carlo — expandido por defecto, 10.000 simulaciones
 # ---------------------------------------------------------------------------
 st.markdown("---")
-with st.expander("Simulacion Monte Carlo del torneo", expanded=False):
+with st.expander("🎲 Simulacion Monte Carlo del torneo", expanded=True):
     st.markdown(
         "<span class='meta'>Simula el torneo completo miles de veces con el modelo "
         "Poisson + Dixon-Coles. Calcula la probabilidad de que cada equipo clasifique "
@@ -258,7 +258,7 @@ with st.expander("Simulacion Monte Carlo del torneo", expanded=False):
     col_mc1, col_mc2 = st.columns([1, 3])
     with col_mc1:
         n_sims = st.select_slider(
-            "Simulaciones", options=[1000, 2000, 5000, 10000], value=5000
+            "Simulaciones", options=[1000, 2000, 5000, 10000], value=10000
         )
     with col_mc2:
         run_mc = st.button("Correr simulacion", key="btn_mc")
