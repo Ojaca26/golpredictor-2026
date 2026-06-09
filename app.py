@@ -108,6 +108,14 @@ st.markdown(
     "no certezas.</span>", unsafe_allow_html=True,
 )
 
+# Indicador de estado de APIs (visible al arrancar)
+_keys_ok = [k for k, v in KEYS.items() if v]
+_keys_ko = [k for k, v in KEYS.items() if not v]
+if _keys_ok:
+    st.success(f"✅ APIs activas: {', '.join(_keys_ok)}", icon=None)
+if _keys_ko:
+    st.warning(f"⚠️ Sin configurar (modo degradado): {', '.join(_keys_ko)}")
+
 # Aviso honesto de calibración
 with st.expander("¿Cómo funciona y qué esperar? (léelo una vez)"):
     st.markdown("""
@@ -141,7 +149,12 @@ if faltan:
         st.warning(f"Faltan keys (modo degradado): {', '.join(faltan)}. "
                    "Configúralas en Settings → Secrets.", icon="⚠️")
 
-partidos = _fixture_cacheado(usar_api)
+try:
+    partidos = _fixture_cacheado(usar_api)
+except Exception as e:
+    st.error(f"Error cargando fixture: {e}")
+    st.stop()
+
 predictor = PoissonPredictor()
 
 
