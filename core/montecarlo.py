@@ -2,30 +2,31 @@
 core/montecarlo.py
 Simulacion Monte Carlo del Mundial 2026.
 
-Simula el torneo N veces usando el modelo de Poisson bivariado y devuelve
-probabilidades de clasificacion y campeonato por equipo.
-
 Flujo:
-  1. Fase de grupos: simula todos los partidos round-robin de cada grupo.
-     Clasifica los 2 primeros por puntos / diferencia de goles / goles a favor.
+  1. Fase de grupos: para partidos YA JUGADOS usa el marcador real;
+     solo simula los pendientes.
   2. Eliminatorias: bracket estandar hasta la final.
-  3. Estadisticas: % de veces que cada equipo clasifica, llega a semis, final, campeon.
+  3. Estadisticas: % de veces que cada equipo clasifica, semis, final, campeon.
+
+Parametros nuevos en simular_torneo():
+  resultados_reales  — {partido_id: (goles_local, goles_visit)}
+  fuerzas_bayes      — {equipo: FuerzaEquipo} ajustadas por Bayes post-torneo
 """
 
 from __future__ import annotations
 import math
 import random
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from core.equipos import get_fuerza
+from core.predictor import FuerzaEquipo
 
 
 # ---------------------------------------------------------------------------
-# Generador de Poisson (sin dependencias externas)
+# Poisson (algoritmo Knuth — sin dependencias externas)
 # ---------------------------------------------------------------------------
 def _muestra_poisson(lam: float) -> int:
-    """Genera un valor de distribucion de Poisson con media lam (algoritmo Knuth)."""
     L = math.exp(-max(0.01, lam))
     k, p = 0, 1.0
     while p > L:
@@ -34,35 +35,41 @@ def _muestra_poisson(lam: float) -> int:
     return k - 1
 
 
-def _simular_goles(local: str, visitante: str) -> Tuple[int, int]:
-    """Devuelve (goles_local, goles_visitante) simulados con Poisson."""
-    fl = get_fuerza(local)
-    fv = get_fuerza(visitante)
-    MEDIA = 1.35
+def _simular_goles(local: str, visitante: str,
+                   fuerzas: Optional[Dict[str, FuerzaEquipo]] = None) -> Tuple[int, int]:
+    """Devuelve (gl, gv) simulados. Usa fuerzas Bayesianas si están disponibles."""
+    fl = (fuerzas.get(local)     if fuerzas else None) or get_fuerza(local)
+    fv = (fuerzas.get(visitante) if fuerzas else None) or get_fuerza(visitante)
+    MEDIA   = 1.35
     VENTAJA = 1.10
     lam_l = max(0.2, min(MEDIA * fl.ataque * fv.defensa * VENTAJA, 4.5))
-    lam_v = max(0.2, min(MEDIA * fv.ataque * fl.defensa, 4.5))
+    lam_v = max(0.2, min(MEDIA * fv.ataque * fl.defensa,           4.5))
     return _muestra_poisson(lam_l), _muestra_poisson(lam_v)
 
 
 # ---------------------------------------------------------------------------
-# Logica de grupos
+# Grupos
 # ---------------------------------------------------------------------------
-def _clasificar(equipos: List[str], matches: List[Tuple[str, str]]) -> List[str]:
+def _clasificar(equipos: List[str],
+                matches: List[Tuple[str, str, Optional[Tuple[int, int]]]],
+                fuerzas: Optional[Dict[str, FuerzaEquipo]] = None) -> List[str]:
     """
-    Simula todos los partidos de un grupo y devuelve la lista ordenada
-    (1ro, 2do, 3ro, 4to) segun puntos > diferencia de goles > goles a favor.
+    Clasifica un grupo.
+    matches: lista de (local, visitante, resultado_conocido_o_None)
+    Si resultado_conocido no es None → usa el marcador real, no simula.
     """
     pts: Dict[str, int] = defaultdict(int)
-    gf: Dict[str, int] = defaultdict(int)
-    gc: Dict[str, int] = defaultdict(int)
+    gf:  Dict[str, int] = defaultdict(int)
+    gc:  Dict[str, int] = defaultdict(int)
 
-    for loc, vis in matches:
-        gl, gv = _simular_goles(loc, vis)
-        gf[loc] += gl
-        gc[loc] += gv
-        gf[vis] += gv
-        gc[vis] += gl
+    for loc, vis, known in matches:
+        if known is not None:
+            gl, gv = known
+        else:
+            gl, gv = _simular_goles(loc, vis, fuerzas)
+
+        gf[loc] += gl;  gc[loc] += gv
+        gf[vis] += gv;  gc[vis] += gl
         if gl > gv:
             pts[loc] += 3
         elif gl == gv:
@@ -76,81 +83,97 @@ def _clasificar(equipos: List[str], matches: List[Tuple[str, str]]) -> List[str]
                   reverse=True)
 
 
-def _partidos_grupo(equipos: List[str]) -> List[Tuple[str, str]]:
-    """Genera todos los partidos round-robin del grupo."""
-    return [(equipos[i], equipos[j])
-            for i in range(len(equipos))
-            for j in range(i + 1, len(equipos))]
+def _construir_partidos_grupo(
+    fixture_grupo: List[Dict],
+    resultados_reales: Dict[int, Tuple[int, int]],
+    equipos: List[str],
+) -> List[Tuple[str, str, Optional[Tuple[int, int]]]]:
+    """
+    Construye la lista completa de partidos del grupo anotando el resultado real
+    cuando ya se jugó. Si falta algún cruce (no debería con fixture correcto),
+    lo agrega sin resultado conocido.
+    """
+    cubiertos: set = set()
+    resultado: List[Tuple[str, str, Optional[Tuple[int, int]]]] = []
+
+    for p in fixture_grupo:
+        loc, vis = p["local"], p["visitante"]
+        known = resultados_reales.get(p["id"])
+        resultado.append((loc, vis, known))
+        cubiertos.add((loc, vis))
+
+    # Asegurar round-robin completo (seguridad)
+    for i in range(len(equipos)):
+        for j in range(i + 1, len(equipos)):
+            par = (equipos[i], equipos[j])
+            if par not in cubiertos and (par[1], par[0]) not in cubiertos:
+                resultado.append((par[0], par[1], None))
+
+    return resultado
 
 
 # ---------------------------------------------------------------------------
-# Simulacion de eliminatorias
+# Eliminatorias
 # ---------------------------------------------------------------------------
-def _ganador_partido(a: str, b: str) -> str:
-    """Simula un partido de eliminacion (penaltis = 50-50 en empate)."""
-    gl, gv = _simular_goles(a, b)
-    if gl > gv:
-        return a
-    elif gv > gl:
-        return b
-    else:
-        return a if random.random() < 0.5 else b
+def _ganador_partido(a: str, b: str,
+                     fuerzas: Optional[Dict[str, FuerzaEquipo]] = None) -> str:
+    gl, gv = _simular_goles(a, b, fuerzas)
+    if gl > gv:   return a
+    elif gv > gl: return b
+    else:         return a if random.random() < 0.5 else b
 
 
-def _simular_bracket(clasificados: List[str]) -> Dict[str, str]:
-    """
-    Simula las eliminatorias desde la ronda dada hasta la final.
-    Devuelve {equipo: ronda_maxima_alcanzada}.
-    """
+def _simular_bracket(clasificados: List[str],
+                     fuerzas: Optional[Dict[str, FuerzaEquipo]] = None) -> Dict[str, str]:
     logros: Dict[str, str] = {}
     ronda = list(clasificados)
-
-    nombres = {
-        32: "dieciseisavos",
-        16: "octavos",
-        8: "cuartos",
-        4: "semis",
-        2: "final",
-    }
+    nombres = {32: "dieciseisavos", 16: "octavos", 8: "cuartos", 4: "semis", 2: "final"}
 
     while len(ronda) > 1:
         n = len(ronda)
-        etapa = nombres.get(n, "ronda_" + str(n))
+        etapa = nombres.get(n, f"ronda_{n}")
         for e in ronda:
             logros[e] = etapa
-
         siguiente = []
         for i in range(0, n, 2):
-            if i + 1 < n:
-                ganador = _ganador_partido(ronda[i], ronda[i + 1])
-            else:
-                ganador = ronda[i]
+            ganador = (_ganador_partido(ronda[i], ronda[i + 1], fuerzas)
+                       if i + 1 < n else ronda[i])
             siguiente.append(ganador)
         ronda = siguiente
 
     if ronda:
         logros[ronda[0]] = "campeon"
-
     return logros
 
 
 # ---------------------------------------------------------------------------
-# Funcion principal
+# Función principal
 # ---------------------------------------------------------------------------
-def simular_torneo(partidos: List[dict], n_sims: int = 5000) -> Dict[str, Dict[str, float]]:
+def simular_torneo(
+    partidos:          List[dict],
+    n_sims:            int = 5000,
+    resultados_reales: Optional[Dict[int, Tuple[int, int]]] = None,
+    fuerzas_bayes:     Optional[Dict[str, FuerzaEquipo]]    = None,
+) -> Dict[str, Dict[str, float]]:
     """
-    Simula el torneo completo n_sims veces.
+    Simula el torneo n_sims veces.
 
-    Parametros:
-        partidos: lista de dicts del fixture (formato interno de la app).
-        n_sims:   numero de simulaciones (5000 es un buen balance velocidad/precision).
+    Parámetros:
+        partidos          — fixture completo.
+        n_sims            — número de simulaciones.
+        resultados_reales — {id_partido: (gl, gv)} ya jugados (no se simulan).
+        fuerzas_bayes     — {equipo: FuerzaEquipo} actualizadas por Bayes.
 
     Retorna:
         {equipo: {"clasifica": p, "octavos": p, "cuartos": p,
                   "semis": p, "final": p, "campeon": p}}
-        donde p es probabilidad entre 0 y 1.
     """
-    grupos_equipos: Dict[str, List[str]] = defaultdict(list)
+    resultados_reales = resultados_reales or {}
+    fuerzas           = fuerzas_bayes     or {}
+
+    # ── 1. Construir estructura de grupos ──────────────────────────────────
+    grupos_equipos:  Dict[str, List[str]]   = defaultdict(list)
+    grupos_fixture:  Dict[str, List[Dict]]  = defaultdict(list)
 
     for p in partidos:
         if p.get("fase", "grupos") != "grupos":
@@ -159,6 +182,7 @@ def simular_torneo(partidos: List[dict], n_sims: int = 5000) -> Dict[str, Dict[s
         if not g:
             continue
         loc, vis = p["local"], p["visitante"]
+        grupos_fixture[g].append(p)
         if loc not in grupos_equipos[g]:
             grupos_equipos[g].append(loc)
         if vis not in grupos_equipos[g]:
@@ -167,10 +191,14 @@ def simular_torneo(partidos: List[dict], n_sims: int = 5000) -> Dict[str, Dict[s
     if not grupos_equipos:
         return {}
 
-    grupos_matches_full: Dict[str, List[Tuple[str, str]]] = {}
+    # ── 2. Pre-construir lista de partidos con resultados conocidos ─────────
+    grupos_matches: Dict[str, List] = {}
     for g, equipos in grupos_equipos.items():
-        grupos_matches_full[g] = _partidos_grupo(equipos)
+        grupos_matches[g] = _construir_partidos_grupo(
+            grupos_fixture[g], resultados_reales, equipos
+        )
 
+    # ── 3. Simulaciones ─────────────────────────────────────────────────────
     conteos: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
     for _ in range(n_sims):
@@ -179,16 +207,16 @@ def simular_torneo(partidos: List[dict], n_sims: int = 5000) -> Dict[str, Dict[s
 
         for g in sorted(grupos_equipos.keys()):
             eq = grupos_equipos[g]
-            clasificados = _clasificar(eq, grupos_matches_full[g])
+            clasificados = _clasificar(eq, grupos_matches[g], fuerzas)
             primeros.append(clasificados[0])
             segundos.append(clasificados[1])
             for e in clasificados[:2]:
                 conteos[e]["clasifica"] += 1
 
-        n_grupos = len(primeros)
+        # Bracket: 1A vs 2B, 1B vs 2A, ...
+        grupos_ord = sorted(grupos_equipos.keys())
+        n_grupos   = len(grupos_ord)
         bracket: List[str] = []
-        grupos_ordenados = sorted(grupos_equipos.keys())
-
         for i in range(0, n_grupos, 2):
             idx_a = i
             idx_b = i + 1 if i + 1 < n_grupos else 0
@@ -197,15 +225,14 @@ def simular_torneo(partidos: List[dict], n_sims: int = 5000) -> Dict[str, Dict[s
 
         while len(bracket) < 16:
             bracket.append(bracket[-1])
-
         bracket = bracket[:16]
 
-        logros = _simular_bracket(bracket)
+        logros = _simular_bracket(bracket, fuerzas)
         for equipo, etapa in logros.items():
             conteos[equipo][etapa] += 1
 
-    resultado: Dict[str, Dict[str, float]] = {}
-    for equipo, c in conteos.items():
-        resultado[equipo] = {k: round(v / n_sims, 4) for k, v in c.items()}
-
-    return resultado
+    # ── 4. Normalizar ────────────────────────────────────────────────────────
+    return {
+        equipo: {k: round(v / n_sims, 4) for k, v in c.items()}
+        for equipo, c in conteos.items()
+    }
