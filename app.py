@@ -3,8 +3,8 @@ GOLPREDICTOR 2026 — Sala de análisis predictivo del Mundial.
 
 Dashboard que:
   - Lista todos los partidos ordenados por fecha (scroll).
-  - Muestra para cada uno: Predicción 1 (óptima por valor esperado) + % ,
-    Predicción 2 (alternativa) + %, probabilidades 1X2, marcador real y análisis IA.
+  - Muestra para cada uno: Predicción 1 (más probable según Poisson+DC) + %,
+    Predicción 2 (óptima para puntos Golpredictor) + %, probabilidades 1X2, marcador real y análisis IA.
   - Compara predicho vs real cuando el partido termina, con desglose de puntos.
   - Incluye un chatbot al pie para preguntar / dar contexto (human in the loop).
 
@@ -125,11 +125,11 @@ with st.expander("ℹ️ ¿Cómo funciona?"):
 **Base de predicción**: ranking FIFA 2026 → fuerzas de ataque/defensa por equipo.
 **Ajuste IA**: Tavily busca noticias/lesiones · Gemini calibra con ese contexto (±20% max).
 **Dixon-Coles**: corrige la subestimación de marcadores bajos (0-0, 1-0, 0-1, 1-1).
-**Bayes (nuevo)**: tras cada partido real, el modelo ajusta las fuerzas de los equipos con lo observado.
-**Optimización**: el marcador elegido maximiza puntos esperados según las reglas de Golpredictor.
+**Bayes**: tras cada partido real, el modelo ajusta las fuerzas de los equipos con lo observado.
 **Monte Carlo**: simula el torneo 10.000 veces; partidos ya jugados quedan fijos, solo se simulan los pendientes.
 
-**Predicción 1** = óptima por valor esperado. **Predicción 2** = alternativa.
+**📊 Predicción 1** = marcador más probable según Poisson + Dixon-Coles (varía mucho por partido).
+**🎯 Predicción 2** = marcador óptimo para maximizar puntos Golpredictor (el estratégico).
 El **%** es la probabilidad de ese marcador exacto (suele ser baja: el fútbol es impredecible).
 """)
 
@@ -153,7 +153,6 @@ except Exception as e:
 predictor = PoissonPredictor()
 
 # ── Fuerzas Bayesianas ──────────────────────────────────────────────────────
-# Se recalculan una vez por sesión y se invalidan cuando entra un resultado nuevo.
 if "fuerzas_bayes" not in st.session_state:
     _res_bayes = almacen.get_resultados_para_bayes(partidos)
     st.session_state["fuerzas_bayes"] = bayesiano.actualizar(_res_bayes)
@@ -167,19 +166,15 @@ if _n_bayes:
 # Cálculo perezoso de predicción + análisis (cacheado en sesión)
 # ---------------------------------------------------------------------------
 def calcular_partido(p: dict) -> dict:
-    """Calcula predicción + análisis y lo guarda en session_state."""
     clave = f"pred_{p['id']}"
     if clave in st.session_state:
         return st.session_state[clave]
 
-    # Análisis completo (fuerzas + razonamiento)
     anal = analizar_partido_completo(
         p["local"], p["visitante"], KEYS["tavily"], KEYS["gemini"]
     )
     fuerzas = anal["fuerzas"]
 
-    # Aplicar fuerzas Bayesianas como línea base post-torneo
-    # (los datos reales del torneo superan al ranking FIFA estático)
     fb = st.session_state.get("fuerzas_bayes", {})
     for eq in [p["local"], p["visitante"]]:
         if eq in fb:
@@ -225,10 +220,8 @@ def _barra(val: float, max_val: float = 2.2, color: str = "#3ddc84") -> str:
 
 
 def _heatmap_html(M, local: str, visitante: str, max_g: int = 5) -> str:
-    """Genera tabla HTML de calor con % de probabilidad por marcador (max_g x max_g)."""
     max_prob = max(M[i][j] for i in range(max_g + 1) for j in range(max_g + 1))
     rows = ["<table style='border-collapse:separate;border-spacing:2px;font-size:.72rem'>"]
-    # Cabecera: goles visitante
     rows.append("<tr>")
     rows.append("<td style='color:#5a6776;padding:3px 6px;font-size:.65rem'>LOC\\ VIS</td>")
     for j in range(max_g + 1):
@@ -246,7 +239,6 @@ def _heatmap_html(M, local: str, visitante: str, max_g: int = 5) -> str:
             prob = M[i][j]
             pct = prob * 100
             intens = (prob / max_prob) if max_prob > 0 else 0
-            # Gradiente oscuro -> verde brillante
             r_c = int(15 + intens * (61 - 15))
             g_c = int(42 + intens * (220 - 42))
             b_c = int(25 + intens * (132 - 25))
@@ -311,14 +303,12 @@ with st.expander("🎲 Simulacion Monte Carlo del torneo", expanded=True):
                 unsafe_allow_html=True,
             )
 
-            # Ordenar por probabilidad de campeon
             equipos_ord = sorted(
                 mc.items(),
                 key=lambda x: x[1].get("campeon", 0),
                 reverse=True,
             )
 
-            # Tabla resumen
             etapas = [
                 ("clasifica", "Clasifica grupos"),
                 ("octavos",   "Octavos"),
@@ -328,7 +318,6 @@ with st.expander("🎲 Simulacion Monte Carlo del torneo", expanded=True):
                 ("campeon",   "Campeon"),
             ]
 
-            # Cabecera
             header_cols = st.columns([2] + [1] * len(etapas))
             header_cols[0].markdown("<span style='color:#7d8a99;font-size:.75rem'>EQUIPO</span>",
                                     unsafe_allow_html=True)
@@ -338,7 +327,6 @@ with st.expander("🎲 Simulacion Monte Carlo del torneo", expanded=True):
                     unsafe_allow_html=True,
                 )
 
-            # Filas (top 20)
             for equipo, datos in equipos_ord[:20]:
                 row_cols = st.columns([2] + [1] * len(etapas))
                 row_cols[0].markdown(
@@ -359,7 +347,6 @@ with st.expander("🎲 Simulacion Monte Carlo del torneo", expanded=True):
                             unsafe_allow_html=True,
                         )
 
-            # Podio top 5 campeons
             st.markdown(
                 "<div style='margin-top:16px;color:#3ddc84;font-size:.9rem;"
                 "font-weight:600;letter-spacing:.5px'>FAVORITOS AL TITULO</div>",
@@ -397,7 +384,6 @@ for fecha in sorted(por_fecha.keys()):
         with st.container():
             c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
 
-            # ── Columna 1: equipos + análisis base ──────────────────────
             with c1:
                 grupo = f" · Grupo {p['grupo']}" if p.get("grupo") else ""
                 sede  = f" · {p['sede']}"         if p.get("sede")  else ""
@@ -409,13 +395,11 @@ for fecha in sorted(por_fecha.keys()):
                     unsafe_allow_html=True,
                 )
 
-                # Fuerzas base (siempre visibles, sin necesidad de calcular)
                 fl = get_fuerza(p["local"])
                 fv = get_fuerza(p["visitante"])
                 with st.expander("📊 Análisis de la IA", expanded=False):
                     if ya:
                         r = st.session_state[f"pred_{p['id']}"]
-                        # Fuerzas ajustadas
                         fl = r.get("fuerza_local", fl)
                         fv = r.get("fuerza_visitante", fv)
                         if r.get("nota_ia"):
@@ -444,7 +428,6 @@ for fecha in sorted(por_fecha.keys()):
                                     unsafe_allow_html=True)
                         st.markdown(_barra(fv.defensa, color="#e05a5a"), unsafe_allow_html=True)
 
-                    # ── Mapa de calor de probabilidades (solo si hay prediccion) ──
                     if ya:
                         r_hm = st.session_state[f"pred_{p['id']}"]
                         fl_hm = r_hm.get("fuerza_local", fl)
@@ -460,7 +443,6 @@ for fecha in sorted(por_fecha.keys()):
                         st.markdown(_heatmap_html(M_hm, p["local"], p["visitante"]),
                                     unsafe_allow_html=True)
 
-            # ── Columna 2 & 3: predicciones ─────────────────────────────
             if not ya:
                 with c2:
                     if st.button("🧮 Calcular", key=f"btn_{p['id']}"):
@@ -477,14 +459,15 @@ for fecha in sorted(por_fecha.keys()):
                 with c2:
                     st.markdown(
                         f"<div class='pred-1'>{o1['marcador'][0]} – {o1['marcador'][1]}</div>"
-                        f"<div class='meta'>Predicción 1 · {o1['prob']*100:.0f}% · "
+                        f"<div class='meta'>📊 Más probable · {o1['prob']*100:.1f}% · "
                         f"<span class='chip chip-pts'>{o1['pts_esperados']:.1f} pts esp.</span></div>",
                         unsafe_allow_html=True,
                     )
                 with c3:
                     st.markdown(
                         f"<div class='pred-2'>{o2['marcador'][0]} – {o2['marcador'][1]}</div>"
-                        f"<div class='meta'>Predicción 2 · {o2['prob']*100:.0f}%</div>"
+                        f"<div class='meta'>🎯 Óptimo puntos · {o2['prob']*100:.1f}% · "
+                        f"<span class='chip chip-pts'>{o2['pts_esperados']:.1f} pts esp.</span></div>"
                         f"<div class='meta'>"
                         f"<span class='chip chip-azul'>1: {pred.prob_victoria_local*100:.0f}%</span> "
                         f"<span class='chip chip-azul'>X: {pred.prob_empate*100:.0f}%</span> "
@@ -493,11 +476,9 @@ for fecha in sorted(por_fecha.keys()):
                         unsafe_allow_html=True,
                     )
 
-            # ── Columna 4: marcador real + puntos ───────────────────────
             with c4:
                 real = guardado.get("real")
                 if real:
-                    # RESULTADO BLOQUEADO — no se puede editar
                     rl, rv = real
                     etiqueta = "🔒 Oficial" if guardado.get("manual") else "🔒 Marcador real"
                     st.markdown(
@@ -516,7 +497,6 @@ for fecha in sorted(por_fecha.keys()):
                             unsafe_allow_html=True,
                         )
                 else:
-                    # Determinar si el partido ya debería haberse jugado
                     try:
                         _fecha_p = dt.date.fromisoformat(p.get("fecha", "9999-12-31"))
                     except Exception:
@@ -524,7 +504,6 @@ for fecha in sorted(por_fecha.keys()):
                     _hoy = dt.date.today()
 
                     if _fecha_p <= _hoy:
-                        # Partido pasado — permitir ingreso manual
                         st.markdown(
                             "<div class='meta' style='color:#ffd25a;font-weight:600'>"
                             "📝 Ingresar resultado:</div>",
@@ -542,12 +521,10 @@ for fecha in sorted(por_fecha.keys()):
                             )
                             if st.form_submit_button("Guardar"):
                                 almacen.set_resultado_manual(p["id"], int(_gl_m), int(_gv_m))
-                                # Invalidar Bayes para recalcular con nuevo resultado
                                 if "fuerzas_bayes" in st.session_state:
                                     del st.session_state["fuerzas_bayes"]
                                 st.cache_data.clear()
                                 st.rerun()
-                        # También ofrecer búsqueda automática
                         if st.button("🔍 Buscar auto", key=f"res_{p['id']}"):
                             with st.spinner("Buscando..."):
                                 r = obtener_resultado_real(
@@ -564,7 +541,6 @@ for fecha in sorted(por_fecha.keys()):
                             else:
                                 st.toast("Sin resultado confiable aún.")
                     else:
-                        # Partido futuro
                         st.markdown("<div class='real-pend'>⏳ pendiente</div>",
                                     unsafe_allow_html=True)
 
