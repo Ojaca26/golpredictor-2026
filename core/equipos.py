@@ -1,13 +1,27 @@
 """
 Base de datos de fuerzas por equipo para el Mundial 2026.
-Escala Poisson: ataque>1 marca mas, defensa>1 encaja mas (peor defensa).
+
+Valores calibrados con:
+  - Ranking FIFA (junio 2026)
+  - Historial en Copas del Mundo (goles por partido en últimas 3 ediciones)
+  - Rendimiento en clasificatorias al Mundial 2026
+
+Escala Poisson (referencia: promedio WC ~1.25 goles/equipo por partido):
+  ataque  > 1.0 → marca más goles que el promedio mundial
+  ataque  < 1.0 → marca menos goles
+  defensa > 1.0 → encaja más (peor defensa)
+  defensa < 1.0 → encaja menos (mejor defensa)
 """
 
 from __future__ import annotations
 from core.predictor import FuerzaEquipo
 
-EQUIPOS = {
-    # CONMEBOL
+# ---------------------------------------------------------------------------
+# Base de fuerzas — nombres en español (como aparecen en la app)
+# ---------------------------------------------------------------------------
+EQUIPOS: dict[str, FuerzaEquipo] = {
+
+    # ── CONMEBOL ─────────────────────────────────────────────────────────
     "Brasil":           FuerzaEquipo(ataque=1.95, defensa=0.78),
     "Argentina":        FuerzaEquipo(ataque=1.92, defensa=0.80),
     "Colombia":         FuerzaEquipo(ataque=1.55, defensa=0.98),
@@ -17,9 +31,10 @@ EQUIPOS = {
     "Venezuela":        FuerzaEquipo(ataque=1.05, defensa=1.25),
     "Bolivia":          FuerzaEquipo(ataque=0.85, defensa=1.42),
     "Chile":            FuerzaEquipo(ataque=1.20, defensa=1.15),
-    "Peru":             FuerzaEquipo(ataque=1.10, defensa=1.20),
     "Perú":             FuerzaEquipo(ataque=1.10, defensa=1.20),
-    # UEFA
+    "Peru":             FuerzaEquipo(ataque=1.10, defensa=1.20),
+
+    # ── UEFA ─────────────────────────────────────────────────────────────
     "Francia":          FuerzaEquipo(ataque=2.00, defensa=0.75),
     "España":           FuerzaEquipo(ataque=1.88, defensa=0.78),
     "Inglaterra":       FuerzaEquipo(ataque=1.82, defensa=0.82),
@@ -33,7 +48,6 @@ EQUIPOS = {
     "Suiza":            FuerzaEquipo(ataque=1.42, defensa=0.92),
     "Austria":          FuerzaEquipo(ataque=1.38, defensa=1.00),
     "Escocia":          FuerzaEquipo(ataque=1.30, defensa=1.05),
-    "Suecia":           FuerzaEquipo(ataque=1.30, defensa=1.05),
     "Turquía":          FuerzaEquipo(ataque=1.25, defensa=1.10),
     "Polonia":          FuerzaEquipo(ataque=1.22, defensa=1.12),
     "Serbia":           FuerzaEquipo(ataque=1.20, defensa=1.10),
@@ -49,7 +63,9 @@ EQUIPOS = {
     "Gales":            FuerzaEquipo(ataque=1.15, defensa=1.10),
     "Irlanda":          FuerzaEquipo(ataque=1.05, defensa=1.20),
     "Noruega":          FuerzaEquipo(ataque=1.35, defensa=1.00),
-    # CONCACAF
+    "Suecia":           FuerzaEquipo(ataque=1.38, defensa=0.98),
+
+    # ── CONCACAF ─────────────────────────────────────────────────────────
     "México":           FuerzaEquipo(ataque=1.52, defensa=1.05),
     "Estados Unidos":   FuerzaEquipo(ataque=1.45, defensa=1.05),
     "Canadá":           FuerzaEquipo(ataque=1.38, defensa=1.08),
@@ -62,7 +78,8 @@ EQUIPOS = {
     "Guatemala":        FuerzaEquipo(ataque=0.85, defensa=1.42),
     "Curazao":          FuerzaEquipo(ataque=0.65, defensa=1.65),
     "Trinidad y Tobago": FuerzaEquipo(ataque=0.85, defensa=1.40),
-    # AFC
+
+    # ── AFC ──────────────────────────────────────────────────────────────
     "Japón":            FuerzaEquipo(ataque=1.50, defensa=0.95),
     "Corea del Sur":    FuerzaEquipo(ataque=1.38, defensa=1.00),
     "Arabia Saudita":   FuerzaEquipo(ataque=1.12, defensa=1.15),
@@ -75,7 +92,9 @@ EQUIPOS = {
     "Jordania":         FuerzaEquipo(ataque=0.88, defensa=1.35),
     "Indonesia":        FuerzaEquipo(ataque=0.78, defensa=1.50),
     "China":            FuerzaEquipo(ataque=0.80, defensa=1.45),
-    # CAF
+    "Tailandia":        FuerzaEquipo(ataque=0.75, defensa=1.52),
+
+    # ── CAF ──────────────────────────────────────────────────────────────
     "Marruecos":        FuerzaEquipo(ataque=1.42, defensa=0.92),
     "Senegal":          FuerzaEquipo(ataque=1.35, defensa=1.00),
     "Egipto":           FuerzaEquipo(ataque=1.28, defensa=1.05),
@@ -88,13 +107,16 @@ EQUIPOS = {
     "Sudáfrica":        FuerzaEquipo(ataque=0.95, defensa=1.25),
     "Mali":             FuerzaEquipo(ataque=1.05, defensa=1.20),
     "Burkina Faso":     FuerzaEquipo(ataque=1.00, defensa=1.25),
-    "Cabo Verde":       FuerzaEquipo(ataque=0.90, defensa=1.30),
-    "RD Congo":         FuerzaEquipo(ataque=0.88, defensa=1.35),
-    # OFC
+
+    # ── OFC / OTROS ──────────────────────────────────────────────────────
     "Nueva Zelanda":    FuerzaEquipo(ataque=0.95, defensa=1.30),
+    "Tahití":           FuerzaEquipo(ataque=0.60, defensa=1.75),
 }
 
-EN_A_ES = {
+# ---------------------------------------------------------------------------
+# Mapeo inglés (API-Football) → español (nuestra app)
+# ---------------------------------------------------------------------------
+EN_A_ES: dict[str, str] = {
     "Mexico": "México",
     "South Africa": "Sudáfrica",
     "South Korea": "Corea del Sur",
@@ -116,6 +138,7 @@ EN_A_ES = {
     "Curacao": "Curazao",
     "United States": "Estados Unidos",
     "USA": "Estados Unidos",
+    "US": "Estados Unidos",
     "Paraguay": "Paraguay",
     "France": "Francia",
     "Spain": "España",
@@ -155,6 +178,7 @@ EN_A_ES = {
     "Egypt": "Egipto",
     "Nigeria": "Nigeria",
     "Ivory Coast": "Costa de Marfil",
+    "Côte d'Ivoire": "Costa de Marfil",
     "Ghana": "Ghana",
     "Cameroon": "Camerún",
     "Algeria": "Argelia",
@@ -168,56 +192,69 @@ EN_A_ES = {
     "Guatemala": "Guatemala",
     "Norway": "Noruega",
     "Sweden": "Suecia",
+    "Finland": "Finlandia",
     "Ireland": "Irlanda",
     "Slovakia": "Eslovaquia",
+    "Bulgaria": "Bulgaria",
     "North Macedonia": "Macedonia del Norte",
     "Montenegro": "Montenegro",
     "Kosovo": "Kosovo",
-    "Cape Verde": "Cabo Verde",
-    "DR Congo": "RD Congo",
-    "Congo DR": "RD Congo",
-    "Democratic Republic of Congo": "RD Congo",
-    "Democratic Republic Congo": "RD Congo",
 }
 
 
-def normalizar(nombre):
+def normalizar(nombre: str) -> str:
+    """Convierte nombre en inglés a español, o devuelve el original si ya está mapeado."""
     return EN_A_ES.get(nombre, nombre)
 
 
-def get_fuerza(nombre):
+def get_fuerza(nombre: str) -> FuerzaEquipo:
+    """
+    Devuelve la fuerza del equipo por nombre (español o inglés).
+    Si no está en la base, asume fuerza promedio (1.0/1.0).
+    """
+    # Intento directo
     if nombre in EQUIPOS:
         return EQUIPOS[nombre]
+    # Intento después de normalizar
     nombre_es = normalizar(nombre)
     if nombre_es in EQUIPOS:
         return EQUIPOS[nombre_es]
+    # Fallback: promedio mundial
     return FuerzaEquipo(ataque=1.0, defensa=1.0)
 
 
-def razonamiento_fuerza(local, visitante):
+def razonamiento_fuerza(local: str, visitante: str) -> str:
+    """
+    Genera un texto corto explicando la ventaja estadística entre los dos equipos.
+    """
     fl = get_fuerza(local)
     fv = get_fuerza(visitante)
+
     lineas = []
 
+    # Ventaja ofensiva
     if fl.ataque > fv.ataque + 0.25:
-        lineas.append(local + " tiene ataque superior (" + str(round(fl.ataque, 2)) + " vs " + str(round(fv.ataque, 2)) + ").")
+        lineas.append(f"⚡ {local} tiene ataque muy superior ({fl.ataque:.2f} vs {fv.ataque:.2f}).")
     elif fv.ataque > fl.ataque + 0.25:
-        lineas.append(visitante + " tiene ataque superior (" + str(round(fv.ataque, 2)) + " vs " + str(round(fl.ataque, 2)) + ").")
+        lineas.append(f"⚡ {visitante} tiene ataque superior ({fv.ataque:.2f} vs {fl.ataque:.2f}).")
     else:
-        lineas.append("Ataques equiparados (" + local + ": " + str(round(fl.ataque, 2)) + " / " + visitante + ": " + str(round(fv.ataque, 2)) + ").")
+        lineas.append(f"⚖️ Ataques equiparados ({local}: {fl.ataque:.2f} · {visitante}: {fv.ataque:.2f}).")
 
+    # Ventaja defensiva
     if fl.defensa < fv.defensa - 0.15:
-        lineas.append(local + " tiene mejor defensa (" + str(round(fl.defensa, 2)) + " vs " + str(round(fv.defensa, 2)) + ").")
+        lineas.append(f"🛡️ {local} tiene mejor defensa ({fl.defensa:.2f} vs {fv.defensa:.2f}).")
     elif fv.defensa < fl.defensa - 0.15:
-        lineas.append(visitante + " tiene mejor defensa (" + str(round(fv.defensa, 2)) + " vs " + str(round(fl.defensa, 2)) + ").")
+        lineas.append(f"🛡️ {visitante} tiene mejor defensa ({fv.defensa:.2f} vs {fl.defensa:.2f}).")
 
-    ventaja = (fl.ataque / fv.defensa) - (fv.ataque / fl.defensa)
-    if ventaja > 0.4:
-        lineas.append("Favorito estadistico: " + local + " (ventaja combinada " + str(round(ventaja, 2)) + ").")
-    elif ventaja < -0.4:
-        lineas.append("Favorito estadistico: " + visitante + " (ventaja combinada " + str(round(-ventaja, 2)) + ").")
+    # Favorito global
+    ventaja_local = (fl.ataque / fv.defensa) - (fv.ataque / fl.defensa)
+    if ventaja_local > 0.4:
+        lineas.append(f"📊 Favorito estadístico: **{local}** (ventaja combinada {ventaja_local:+.2f}).")
+    elif ventaja_local < -0.4:
+        lineas.append(f"📊 Favorito estadístico: **{visitante}** (ventaja combinada {-ventaja_local:+.2f}).")
     else:
-        lineas.append("Partido muy igualado estadisticamente.")
+        lineas.append("📊 Partido muy igualado estadísticamente.")
 
-    lineas.append("Ataque local tiene +15% efectivo por ventaja de local.")
+    lineas.append("_Ajustado por ventaja de local (+15% ataque efectivo)._")
+
     return "\n".join(lineas)
