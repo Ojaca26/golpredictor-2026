@@ -124,7 +124,6 @@ class PoissonPredictor:
     # Promedio de goles por equipo y partido en mundiales (fase de grupos ~1.30).
     PROMEDIO_GOLES_LIGA = 1.30
     # Ventaja de sede: el Mundial se juega en venues casi neutrales.
-    # Hosts reales (USA/Canadá/México) reciben un boost extra en app.py.
     VENTAJA_LOCAL = 1.05
     MAX_GOLES = 8  # tope de goles a considerar por equipo
 
@@ -139,14 +138,13 @@ class PoissonPredictor:
         fl, fv = self._fuerza(local), self._fuerza(visitante)
         lam_local = self.PROMEDIO_GOLES_LIGA * fl.ataque * fv.defensa * self.VENTAJA_LOCAL
         lam_visit = self.PROMEDIO_GOLES_LIGA * fv.ataque * fl.defensa
-        # acotar para evitar valores absurdos
         return max(0.2, min(lam_local, 4.5)), max(0.2, min(lam_visit, 4.5))
 
     def matriz_probabilidades(self, lam_local: float, lam_visit: float,
                                rho: float = RHO_DC):
         """
         Devuelve P[gl][gv] = probabilidad de ese marcador exacto.
-        Aplica la corrección Dixon-Coles para marcadores bajos (rho=-0.13 por defecto).
+        Aplica la corrección Dixon-Coles para marcadores bajos.
         """
         pl = [_poisson_pmf(i, lam_local) for i in range(self.MAX_GOLES + 1)]
         pv = [_poisson_pmf(j, lam_visit) for j in range(self.MAX_GOLES + 1)]
@@ -155,7 +153,6 @@ class PoissonPredictor:
              for j in range(self.MAX_GOLES + 1)]
             for i in range(self.MAX_GOLES + 1)
         ]
-        # Renormalizar para que la matriz sume exactamente 1.0
         total = sum(M[i][j] for i in range(self.MAX_GOLES + 1)
                     for j in range(self.MAX_GOLES + 1))
         if total > 0:
@@ -164,10 +161,6 @@ class PoissonPredictor:
         return M
 
     def matriz_heatmap(self, lam_local: float, lam_visit: float, max_g: int = 5):
-        """
-        Devuelve una sub-matriz max_g x max_g (porcentajes redondeados)
-        lista para mostrar como mapa de calor en la UI.
-        """
         M = self.matriz_probabilidades(lam_local, lam_visit)
         return [[round(M[i][j] * 100, 1) for j in range(max_g + 1)]
                 for i in range(max_g + 1)]
@@ -176,21 +169,18 @@ class PoissonPredictor:
         lam_l, lam_v = self._lambdas(local, visitante)
         M = self.matriz_probabilidades(lam_l, lam_v)
 
-        # 1) marcadores más probables (para mostrar como "predicción cruda")
         marcadores = []
         for i in range(self.MAX_GOLES + 1):
             for j in range(self.MAX_GOLES + 1):
                 marcadores.append((i, j, M[i][j]))
         marcadores.sort(key=lambda x: x[2], reverse=True)
 
-        # 2) probabilidades de resultado (1X2)
         p_local = sum(M[i][j] for i in range(self.MAX_GOLES + 1)
                       for j in range(self.MAX_GOLES + 1) if i > j)
         p_empate = sum(M[i][i] for i in range(self.MAX_GOLES + 1))
         p_visit = sum(M[i][j] for i in range(self.MAX_GOLES + 1)
                       for j in range(self.MAX_GOLES + 1) if i < j)
 
-        # 3) CLAVE: elegir el pronóstico que MAXIMIZA puntos esperados.
         mejor_pron = (0, 0)
         mejor_ev = -1.0
         for cl in range(self.MAX_GOLES + 1):
@@ -218,26 +208,20 @@ class PoissonPredictor:
         """
         Devuelve dos opciones de pronóstico:
           - Opción 1: marcador MÁS PROBABLE según el modelo Poisson+DC.
-            Responde a "¿qué marcador cree el modelo que tiene más chances?".
-            Varía mucho entre partidos (1-0, 0-0, 1-1, 2-0, 3-1, etc.)
           - Opción 2: marcador que MAXIMIZA puntos esperados bajo las reglas
-            de Golpredictor. Responde a "¿qué pronosticar para sumar más?".
-            Suele ser el local ganando; a veces coincide con Opción 1.
+            de Golpredictor.
         """
         pred = self.predecir(local, visitante, reglas)
         lam_l, lam_v = self._lambdas(local, visitante)
         M = self.matriz_probabilidades(lam_l, lam_v)
 
-        # Opción 1 = marcador de máxima probabilidad
-        top = pred.marcadores[0]   # (i, j, prob) — ya ordenado desc por prob
+        top = pred.marcadores[0]
         op1 = (top[0], top[1])
         prob_op1 = top[2]
 
-        # Opción 2 = EV-óptimo (para maximizar puntos Golpredictor)
         op2 = pred.optimo
         prob_op2 = M[op2[0]][op2[1]]
 
-        # Si ambas coinciden, op2 = segundo más probable
         if op2 == op1:
             for (i, j, p) in pred.marcadores[1:]:
                 op2 = (i, j)
@@ -266,7 +250,6 @@ class PoissonPredictor:
 
 
 if __name__ == "__main__":
-    # Demo rápida
     fuerzas = {
         "Brasil": FuerzaEquipo(ataque=1.6, defensa=0.7),
         "Serbia": FuerzaEquipo(ataque=0.9, defensa=1.2),
@@ -277,7 +260,5 @@ if __name__ == "__main__":
     print(f"{p.local} vs {p.visitante}")
     print(f"  P(gana local)={p.prob_victoria_local:.0%}  "
           f"P(empate)={p.prob_empate:.0%}  P(gana visit)={p.prob_victoria_visit:.0%}")
-    print(f"  Opción 1 (más probable): {r['opcion_1']['marcador']}  "
-          f"prob={r['opcion_1']['prob']:.1%}")
-    print(f"  Opción 2 (óptimo pts): {r['opcion_2']['marcador']}  "
-          f"EV={r['opcion_2']['pts_esperados']} pts")
+    print(f"  Opción 1: {r['opcion_1']['marcador']}  prob={r['opcion_1']['prob']:.1%}")
+    print(f"  Opción 2: {r['opcion_2']['marcador']}  prob={r['opcion_2']['prob']:.1%}")
