@@ -50,7 +50,7 @@ KEYS = {
     "footballdata": secreto("FOOTBALLDATA_KEY"),
     "tavily":       secreto("TAVILY_API_KEY"),
     "serper":       secreto("SERPER_API_KEY"),
-    "gemini":       secreto("GEMINI_API_KEY"),
+    "deepseek":     secreto("DEEPSEEK_API_KEY"),
 }
 
 
@@ -172,7 +172,7 @@ def calcular_partido(p: dict) -> dict:
 
     # Análisis completo (fuerzas + razonamiento)
     anal = analizar_partido_completo(
-        p["local"], p["visitante"], KEYS["tavily"], KEYS["gemini"]
+        p["local"], p["visitante"], KEYS["tavily"], KEYS["deepseek"]
     )
     fuerzas = anal["fuerzas"]
 
@@ -228,7 +228,7 @@ def _heatmap_html(M, local: str, visitante: str, max_g: int = 5) -> str:
     rows = ["<table style='border-collapse:separate;border-spacing:2px;font-size:.72rem'>"]
     # Cabecera: goles visitante
     rows.append("<tr>")
-    rows.append("<td style='color:#5a6776;padding:3px 6px;font-size:.65rem'>LOC/ VIS</td>")
+    rows.append("<td style='color:#5a6776;padding:3px 6px;font-size:.65rem'>LOC\\ VIS</td>")
     for j in range(max_g + 1):
         rows.append(
             f"<td style='color:#6ab4ff;text-align:center;padding:3px 8px;"
@@ -626,6 +626,6 @@ if entrada := st.chat_input("Escribe aquí... ej: '¿Quién gana Brasil vs Marru
     with st.chat_message("assistant"):
         with st.spinner("Analizando..."):
             ctx = buscar_contexto_tavily(entrada, KEYS["tavily"], max_resultados=4)
-            respuesta = responder_chat(entrada, ctx, KEYS["gemini"])
+            respuesta = responder_chat(entrada, ctx, KEYS["deepseek"])
         st.markdown(respuesta)
     st.session_state.chat.append({"role": "assistant", "content": respuesta})
