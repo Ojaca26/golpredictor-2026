@@ -1,17 +1,16 @@
 """
 Capa de inteligencia: combina una base de datos de fuerzas por equipo (FIFA ranking)
-con contexto web (Tavily) y razonamiento de Gemini para calibrar predicciones.
+con contexto web (Tavily) y razonamiento de DeepSeek para calibrar predicciones.
 
 Flujo:
   1. equipos.py entrega fuerzas base (FIFA ranking) → predicciones ya diferenciadas.
   2. Tavily busca contexto actualizado (lesiones, forma reciente, noticias).
-  3. Gemini ajusta las fuerzas base con el contexto encontrado (+/- 20% máx).
+  3. DeepSeek ajusta las fuerzas base con el contexto encontrado (+/- 20% máx).
   4. Si no hay keys de IA, las fuerzas base ya producen predicciones realistas.
 """
 
 from __future__ import annotations
 import json
-import os
 import re
 from typing import Dict, Optional, Tuple
 
@@ -53,12 +52,29 @@ def buscar_contexto_tavily(consulta: str, api_key: str, max_resultados: int = 5)
 
 
 # ----------------------------------------------------------------------------
-# Razonamiento (Gemini) — ajusta sobre las fuerzas base
+# Razonamiento (DeepSeek) — ajusta sobre las fuerzas base
 # ----------------------------------------------------------------------------
-GEMINI_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-2.0-flash:generateContent"
-)
+DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
+DEEPSEEK_MODEL = "deepseek-chat"
+
+
+def _deepseek_call(prompt: str, api_key: str, temperature: float = 0.3) -> str:
+    """Llama a DeepSeek y devuelve el texto de la respuesta."""
+    resp = requests.post(
+        DEEPSEEK_URL,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        json={
+            "model": DEEPSEEK_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+        },
+        timeout=40,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
 
 
 def _extraer_json(texto: str) -> Optional[dict]:
@@ -71,14 +87,14 @@ def _extraer_json(texto: str) -> Optional[dict]:
         return None
 
 
-def _ajustar_con_gemini(
+def _ajustar_con_deepseek(
     equipo_a: str, equipo_b: str,
     fuerza_a: FuerzaEquipo, fuerza_b: FuerzaEquipo,
     contexto: str, api_key: str
 ) -> Tuple[FuerzaEquipo, FuerzaEquipo, str]:
     """
-    Pide a Gemini que ajuste las fuerzas base con el contexto actual.
-    Devuelve (fuerza_a_ajustada, fuerza_b_ajustada, nota_gemini).
+    Pide a DeepSeek que ajuste las fuerzas base con el contexto actual.
+    Devuelve (fuerza_a_ajustada, fuerza_b_ajustada, nota_ia).
     Máximo ±20% de ajuste sobre la base para evitar delirios.
     """
     if not api_key or not contexto or contexto.startswith("[contexto"):
@@ -97,22 +113,14 @@ CONTEXTO ACTUAL (lesiones, forma reciente, noticias):
 Ajusta los valores con el contexto. IMPORTANTE: el ajuste máximo permitido es ±0.20 sobre
 la base. Si no hay información relevante, mantén los valores base.
 
-Responde SOLO con JSON exactamente así:
+Responde SOLO con JSON exactamente así (sin texto extra):
 {{
-  "{equipo_a}": {{"ataque": <num>, "defensa": <num>, "nota": "<motivo ajuste en 1 línea>"}},
-  "{equipo_b}": {{"ataque": <num>, "defensa": <num>, "nota": "<motivo ajuste en 1 línea>"}}
+  "{equipo_a}": {{"ataque": <num>, "defensa": <num>, "nota": "<motivo en 1 línea>"}},
+  "{equipo_b}": {{"ataque": <num>, "defensa": <num>, "nota": "<motivo en 1 línea>"}}
 }}"""
 
     try:
-        resp = requests.post(
-            f"{GEMINI_URL}?key={api_key}",
-            headers={"Content-Type": "application/json"},
-            json={"contents": [{"parts": [{"text": prompt}]}],
-                  "generationConfig": {"temperature": 0.2}},
-            timeout=40,
-        )
-        resp.raise_for_status()
-        texto = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        texto = _deepseek_call(prompt, api_key, temperature=0.2)
         parsed = _extraer_json(texto)
         if not parsed:
             return fuerza_a, fuerza_b, ""
@@ -129,7 +137,7 @@ Responde SOLO con JSON exactamente así:
 
         fa_new, nota_a = _parse_eq(equipo_a, fuerza_a)
         fb_new, nota_b = _parse_eq(equipo_b, fuerza_b)
-        nota = f"🤖 Gemini: {nota_a} / {nota_b}" if (nota_a or nota_b) else ""
+        nota = f"🤖 DeepSeek: {nota_a} / {nota_b}" if (nota_a or nota_b) else ""
         return fa_new, fb_new, nota
 
     except Exception:
@@ -138,16 +146,16 @@ Responde SOLO con JSON exactamente así:
 
 def analizar_partido(
     local: str, visitante: str,
-    tavily_key: str, gemini_key: str,
+    tavily_key: str, deepseek_key: str,
 ) -> Dict[str, FuerzaEquipo]:
     """
     Devuelve fuerzas calibradas para el partido.
-    Base = ranking FIFA (equipos.py). Ajuste = Gemini+Tavily si hay keys.
+    Base = ranking FIFA (equipos.py). Ajuste = DeepSeek+Tavily si hay keys.
     """
     fuerza_local = get_fuerza(local)
     fuerza_visitante = get_fuerza(visitante)
 
-    if not tavily_key and not gemini_key:
+    if not tavily_key and not deepseek_key:
         return {local: fuerza_local, visitante: fuerza_visitante}
 
     consulta = (
@@ -155,15 +163,15 @@ def analizar_partido(
         f"resultados últimos partidos análisis"
     )
     contexto = buscar_contexto_tavily(consulta, tavily_key)
-    fl_aj, fv_aj, _ = _ajustar_con_gemini(
-        local, visitante, fuerza_local, fuerza_visitante, contexto, gemini_key
+    fl_aj, fv_aj, _ = _ajustar_con_deepseek(
+        local, visitante, fuerza_local, fuerza_visitante, contexto, deepseek_key
     )
     return {local: fl_aj, visitante: fv_aj}
 
 
 def analizar_partido_completo(
     local: str, visitante: str,
-    tavily_key: str, gemini_key: str,
+    tavily_key: str, deepseek_key: str,
 ) -> Dict:
     """
     Como analizar_partido pero devuelve también el razonamiento y notas de IA.
@@ -175,14 +183,14 @@ def analizar_partido_completo(
     razonamiento = razonamiento_fuerza(local, visitante)
     nota_ia = ""
 
-    if tavily_key or gemini_key:
+    if tavily_key or deepseek_key:
         consulta = (
             f"{local} vs {visitante} Mundial 2026 forma reciente lesiones "
             f"resultados últimos partidos análisis"
         )
         contexto = buscar_contexto_tavily(consulta, tavily_key)
-        fl_aj, fv_aj, nota_ia = _ajustar_con_gemini(
-            local, visitante, fuerza_local, fuerza_visitante, contexto, gemini_key
+        fl_aj, fv_aj, nota_ia = _ajustar_con_deepseek(
+            local, visitante, fuerza_local, fuerza_visitante, contexto, deepseek_key
         )
     else:
         fl_aj, fv_aj = fuerza_local, fuerza_visitante
@@ -202,7 +210,7 @@ def responder_chat(pregunta: str, contexto: str, api_key: str) -> str:
     contexto web encontrado.
     """
     if not api_key:
-        return ("No hay clave de Gemini configurada. Confígurala en Settings → "
+        return ("No hay clave de DeepSeek configurada. Confígurala en "
                 "Environment Variables en Render para activar el chat con IA.")
     prompt = f"""Eres un analista de fútbol experto y honesto que ayuda a un usuario
 a preparar pronósticos del Mundial 2026. Sé claro, específico y NUNCA prometas
@@ -217,14 +225,6 @@ PREGUNTA DEL USUARIO:
 
 Responde en español, conciso y útil."""
     try:
-        resp = requests.post(
-            f"{GEMINI_URL}?key={api_key}",
-            headers={"Content-Type": "application/json"},
-            json={"contents": [{"parts": [{"text": prompt}]}],
-                  "generationConfig": {"temperature": 0.6}},
-            timeout=40,
-        )
-        resp.raise_for_status()
-        return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        return _deepseek_call(prompt, api_key, temperature=0.6)
     except Exception as e:
         return f"No pude generar respuesta ahora ({e}). Intenta de nuevo."
