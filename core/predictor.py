@@ -74,7 +74,9 @@ def _poisson_pmf(k: int, lam: float) -> float:
 
 # Parámetro de correlación Dixon-Coles estimado en partidos de fútbol
 # (negativo: los marcadores bajos son más frecuentes de lo que predice Poisson puro)
-RHO_DC = -0.13
+# Actualizado con datos reales WC2026 jornadas 1-2: tasa de empates real 33% (10/30 partidos)
+# vs ~20% que predice el modelo con -0.13. Aumentamos corrección para empates.
+RHO_DC = -0.22
 
 
 def _tau_dc(gl: int, gv: int, lam: float, mu: float, rho: float = RHO_DC) -> float:
@@ -122,8 +124,8 @@ class PoissonPredictor:
     """
 
     # Promedio de goles por equipo por partido.
-    # Actualizado con datos reales Mundial 2026 (jornadas 1-2): ~3.0 goles/partido = 1.50/equipo.
-    PROMEDIO_GOLES_LIGA = 1.50
+    # Datos reales WC2026 jornadas 1-2: 87 goles en 30 partidos = 2.9/partido = 1.45/equipo.
+    PROMEDIO_GOLES_LIGA = 1.45
     # Ventaja de sede: hosts reales (México/USA/Canadá) tienen boost real en casa.
     VENTAJA_LOCAL = 1.05
     MAX_GOLES = 8  # tope de goles a considerar por equipo
@@ -146,7 +148,7 @@ class PoissonPredictor:
                                rho: float = RHO_DC):
         """
         Devuelve P[gl][gv] = probabilidad de ese marcador exacto.
-        Aplica la corrección Dixon-Coles para marcadores bajos (rho=-0.13 por defecto).
+        Aplica la corrección Dixon-Coles para marcadores bajos (rho=-0.22 por defecto).
         """
         pl = [_poisson_pmf(i, lam_local) for i in range(self.MAX_GOLES + 1)]
         pv = [_poisson_pmf(j, lam_visit) for j in range(self.MAX_GOLES + 1)]
