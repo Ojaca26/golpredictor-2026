@@ -21,7 +21,7 @@ from core.predictor import FuerzaEquipo
 # ---------------------------------------------------------------------------
 EQUIPOS: dict[str, FuerzaEquipo] = {
 
-    # ── CONMEBOL ──────────────────────────────────────────────────────
+    # ── CONMEBOL ─────────────────────────────────────────────────────────
     "Brasil":           FuerzaEquipo(ataque=1.95, defensa=0.78),
     "Argentina":        FuerzaEquipo(ataque=1.92, defensa=0.80),
     "Colombia":         FuerzaEquipo(ataque=1.55, defensa=0.98),
@@ -34,7 +34,7 @@ EQUIPOS: dict[str, FuerzaEquipo] = {
     "Perú":             FuerzaEquipo(ataque=1.10, defensa=1.20),
     "Peru":             FuerzaEquipo(ataque=1.10, defensa=1.20),
 
-    # ── UEFA ───────────────────────────────────────────────────────────────
+    # ── UEFA ─────────────────────────────────────────────────────────────
     "Francia":          FuerzaEquipo(ataque=2.00, defensa=0.75),
     "España":           FuerzaEquipo(ataque=1.95, defensa=0.75),  # Actualizado: 4-0 vs Cabo Verde J1
     "Inglaterra":       FuerzaEquipo(ataque=1.82, defensa=0.82),
@@ -65,7 +65,7 @@ EQUIPOS: dict[str, FuerzaEquipo] = {
     "Noruega":          FuerzaEquipo(ataque=1.35, defensa=1.00),
     "Suecia":           FuerzaEquipo(ataque=1.38, defensa=0.98),
 
-    # ── CONCACAF ──────────────────────────────────────────────────────────
+    # ── CONCACAF ─────────────────────────────────────────────────────────
     "México":           FuerzaEquipo(ataque=1.52, defensa=1.05),
     "Estados Unidos":   FuerzaEquipo(ataque=1.45, defensa=1.05),
     "Canadá":           FuerzaEquipo(ataque=1.38, defensa=1.08),
@@ -79,7 +79,7 @@ EQUIPOS: dict[str, FuerzaEquipo] = {
     "Curazao":          FuerzaEquipo(ataque=0.65, defensa=1.65),
     "Trinidad y Tobago": FuerzaEquipo(ataque=0.85, defensa=1.40),
 
-    # ── AFC ────────────────────────────────────────────────────────────────
+    # ── AFC ──────────────────────────────────────────────────────────────
     "Japón":            FuerzaEquipo(ataque=1.50, defensa=0.95),
     "Corea del Sur":    FuerzaEquipo(ataque=1.38, defensa=1.00),
     "Arabia Saudita":   FuerzaEquipo(ataque=0.95, defensa=1.22),  # Actualizado: 0-2 vs Uruguay J1 (sin gol)
@@ -94,23 +94,24 @@ EQUIPOS: dict[str, FuerzaEquipo] = {
     "China":            FuerzaEquipo(ataque=0.80, defensa=1.45),
     "Tailandia":        FuerzaEquipo(ataque=0.75, defensa=1.52),
 
-    # ── CAF ────────────────────────────────────────────────────────────────
+    # ── CAF ──────────────────────────────────────────────────────────────
     "Marruecos":        FuerzaEquipo(ataque=1.42, defensa=0.92),
     "Senegal":          FuerzaEquipo(ataque=1.35, defensa=1.00),
     "Egipto":           FuerzaEquipo(ataque=1.28, defensa=1.05),
     "Nigeria":          FuerzaEquipo(ataque=1.25, defensa=1.10),
-    "Costa de Marfil":  FuerzaEquipo(ataque=1.42, defensa=1.00),
+    "Costa de Marfil":  FuerzaEquipo(ataque=1.42, defensa=1.00),  # Actualizado: venció a Francia 2-1, Escocia 1-0, Corea del Sur 4-0 en prep. Mundial 2026
     "Ghana":            FuerzaEquipo(ataque=1.18, defensa=1.15),
     "Camerún":          FuerzaEquipo(ataque=1.15, defensa=1.18),
     "Argelia":          FuerzaEquipo(ataque=1.20, defensa=1.12),
     "Túnez":            FuerzaEquipo(ataque=1.10, defensa=1.15),
     "Sudáfrica":        FuerzaEquipo(ataque=0.95, defensa=1.25),
+    "R.D. Congo":       FuerzaEquipo(ataque=1.02, defensa=1.20),
     "Mali":             FuerzaEquipo(ataque=1.05, defensa=1.20),
     "Burkina Faso":     FuerzaEquipo(ataque=1.00, defensa=1.25),
 
-    # ── OFC / OTROS ──────────────────────────────────────────────────────────
+    # ── OFC / OTROS ──────────────────────────────────────────────────────
     "Nueva Zelanda":    FuerzaEquipo(ataque=0.95, defensa=1.30),
-    "Tahítí":           FuerzaEquipo(ataque=0.60, defensa=1.75),
+    "Tahití":           FuerzaEquipo(ataque=0.60, defensa=1.75),
     "Cabo Verde":       FuerzaEquipo(ataque=0.85, defensa=1.40),  # Debutante. 0-4 vs España J1
 }
 
@@ -186,6 +187,10 @@ EN_A_ES: dict[str, str] = {
     "Tunisia": "Túnez",
     "New Zealand": "Nueva Zelanda",
     "Cape Verde": "Cabo Verde",
+    "DR Congo": "R.D. Congo",
+    "Congo DR": "R.D. Congo",
+    "Democratic Republic of Congo": "R.D. Congo",
+    "Republic of Congo": "R.D. Congo",
     "Panama": "Panamá",
     "Costa Rica": "Costa Rica",
     "Honduras": "Honduras",
