@@ -173,13 +173,13 @@ SEMILLA: List[Dict] = [
     {"id": 62, "fecha": "2026-06-17", "fase": "grupos", "grupo": "K",
      "sede": "Houston",           "local": "Colombia",   "visitante": "Uzbekistán"},
     {"id": 63, "fecha": "2026-06-23", "fase": "grupos", "grupo": "K",
-     "sede": "Dallas",            "local": "Portugal",   "visitante": "Colombia"},
+     "sede": "Dallas",            "local": "Portugal",   "visitante": "Uzbekistán"},
     {"id": 64, "fecha": "2026-06-23", "fase": "grupos", "grupo": "K",
-     "sede": "Los Ángeles",       "local": "R.D. Congo", "visitante": "Uzbekistán"},
+     "sede": "Los Ángeles",       "local": "Colombia",   "visitante": "R.D. Congo"},
     {"id": 65, "fecha": "2026-06-27", "fase": "grupos", "grupo": "K",
-     "sede": "Nueva York",        "local": "Portugal",   "visitante": "Uzbekistán"},
+     "sede": "Nueva York",        "local": "Portugal",   "visitante": "Colombia"},
     {"id": 66, "fecha": "2026-06-27", "fase": "grupos", "grupo": "K",
-     "sede": "Chicago",           "local": "Colombia",   "visitante": "R.D. Congo"},
+     "sede": "Chicago",           "local": "R.D. Congo", "visitante": "Uzbekistán"},
 
     # ── GRUPO L: Inglaterra · Croacia · Ghana · Panamá ──────────────────────
     {"id": 67, "fecha": "2026-06-17", "fase": "grupos", "grupo": "L",
