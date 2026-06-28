@@ -54,5 +54,15 @@
   "67": {"real": [4, 2], "manual": true},
   "68": {"real": [1, 0], "manual": true},
   "53": {"real": [4, 1], "manual": true},
-  "54": {"real": [5, 0], "manual": true}
+  "54": {"real": [5, 0], "manual": true},
+  "41": {"real": [5, 1], "manual": true},
+  "42": {"real": [1, 1], "manual": true},
+  "47": {"real": [1, 0], "manual": true},
+  "48": {"real": [0, 0], "manual": true},
+  "59": {"real": [3, 1], "manual": true},
+  "60": {"real": [3, 3], "manual": true},
+  "65": {"real": [0, 0], "manual": true},
+  "66": {"real": [3, 1], "manual": true},
+  "71": {"real": [0, 2], "manual": true},
+  "72": {"real": [2, 1], "manual": true}
 }
