@@ -28,6 +28,8 @@ from core.analisis import analizar_resultado
 from core.equipos import get_fuerza, razonamiento_fuerza
 from core import almacen, bayesiano
 from core.montecarlo import simular_torneo
+from core.llave import generar_html_llave
+import streamlit.components.v1 as stc
 
 
 # ---------------------------------------------------------------------------
@@ -378,6 +380,45 @@ with st.expander("🎲 Simulacion Monte Carlo del torneo", expanded=True):
                 )
         else:
             st.info("No hay grupos con fixture definido para simular.")
+
+st.markdown("---")
+
+# ---------------------------------------------------------------------------
+# Llave del torneo (R32 → Final)
+# ---------------------------------------------------------------------------
+with st.expander("🏆 Llave del torneo — 1/16 a Final", expanded=True):
+    _r32_partidos = sorted(
+        [p for p in partidos if p.get("ronda") == "R32"],
+        key=lambda x: x["id"],
+    )
+    if len(_r32_partidos) < 16:
+        st.info("Faltan partidos de eliminatoria en el fixture para mostrar la llave.")
+    else:
+        _fb_llave = st.session_state.get("fuerzas_bayes", {})
+
+        def _get_pred_llave(local: str, visitante: str):
+            """Devuelve ([g_local, g_visit], p1, p2, winner_name) usando Poisson+Bayes."""
+            _fl = _fb_llave.get(local, get_fuerza(local))
+            _fv = _fb_llave.get(visitante, get_fuerza(visitante))
+            predictor.fuerzas = {local: _fl, visitante: _fv}
+            try:
+                qr = predictor.top_dos_pronosticos(local, visitante, Reglas.eliminatorias())
+                pred = qr["prediccion"]
+                o1  = qr["opcion_1"]
+                pm  = list(o1["marcador"])
+                p1  = round(pred.prob_victoria_local * 100)
+                p2  = round(pred.prob_victoria_visit * 100)
+                winner = local if pm[0] > pm[1] else visitante
+            except Exception:
+                pm, p1, p2, winner = [1, 1], 50, 50, local
+            return pm, p1, p2, winner
+
+        _html_llave = generar_html_llave(
+            _r32_partidos[:16],
+            lambda pid: almacen.get_prediccion(pid),
+            _get_pred_llave,
+        )
+        stc.html(_html_llave, height=680, scrolling=True)
 
 st.markdown("---")
 st.markdown(f"<span class='meta'>Mostrando {len(partidos)} partidos · "
