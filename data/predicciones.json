@@ -64,5 +64,7 @@
   "65": {"real": [0, 0], "manual": true},
   "66": {"real": [3, 1], "manual": true},
   "71": {"real": [0, 2], "manual": true},
-  "72": {"real": [2, 1], "manual": true}
+  "72": {"real": [2, 1], "manual": true},
+  "73": {"real": [0, 1], "manual": true},
+  "74": {"real": [2, 1], "manual": true}
 }
