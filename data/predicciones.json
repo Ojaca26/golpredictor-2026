@@ -66,5 +66,8 @@
   "71": {"real": [0, 2], "manual": true},
   "72": {"real": [2, 1], "manual": true},
   "73": {"real": [0, 1], "manual": true},
-  "74": {"real": [2, 1], "manual": true}
+  "74": {"real": [2, 1], "manual": true},
+  "75": {"real": [1, 1], "manual": true, "penaltis": "visitante"},
+  "76": {"real": [1, 1], "manual": true, "penaltis": "visitante"},
+  "77": {"real": [1, 2], "manual": true}
 }

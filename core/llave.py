@@ -23,9 +23,6 @@ BRACKET_LEFT  = [(75, 74), (78, 77), (73, 79), (76, 80)]
 BRACKET_RIGHT = [(84, 87), (83, 86), (82, 85), (81, 88)]
 
 
-# ---------------------------------------------------------------------------
-# CSS
-# ---------------------------------------------------------------------------
 _CSS = """
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -53,7 +50,7 @@ h2{text-align:center;color:#3ddc84;letter-spacing:2px;font-size:1rem;margin-bott
 """
 
 
-def _abrev(nombre: str, max_len: int = 13) -> str:
+def _abrev(nombre, max_len=13):
     nombres_cortos = {
         "Bosnia y Herzegovina": "Bosnia",
         "Costa de Marfil": "C. de Marfil",
@@ -67,13 +64,17 @@ def _abrev(nombre: str, max_len: int = 13) -> str:
     return nombres_cortos.get(nombre, nombre[:max_len])
 
 
-def _match_box(t1, t2, pred, p1, p2, real, winner):
+def _match_box(t1, t2, pred, p1, p2, real, winner, penaltis=None):
     t1s = _abrev(t1)
     t2s = _abrev(t2)
     t1_cls = "team win" if winner == t1 else "team"
     t2_cls = "team win" if winner == t2 else "team"
     pred_html = "<span class='pred-sc'>" + str(pred[0]) + "–" + str(pred[1]) + "</span>"
-    real_html = ("<span class='real-sc'>(" + str(real[0]) + "–" + str(real[1]) + ")</span>") if real else ""
+    if real:
+        pen_lbl = " <span style='color:#6ab4ff;font-size:.6rem'>(pen.)</span>" if penaltis else ""
+        real_html = "<span class='real-sc'>(" + str(real[0]) + "–" + str(real[1]) + ")</span>" + pen_lbl
+    else:
+        real_html = ""
     p1_str = str(p1) + "%" if p1 else ""
     p2_str = str(p2) + "%" if p2 else ""
     if t1 == "TBD" and t2 == "TBD":
@@ -99,67 +100,52 @@ def _round_col(label, boxes, gap_px):
     )
 
 
-# ---------------------------------------------------------------------------
-# Funcion principal
-# ---------------------------------------------------------------------------
 def generar_html_llave(r32_partidos, get_almacen_result, get_pred):
-    """
-    Genera el HTML completo del bracket.
-    r32_partidos: lista de 16 partidos R32.
-    get_almacen_result: callable(id) -> dict con .get('real')
-    get_pred: callable(local, visitante) -> ([g_local, g_visit], p1, p2, winner_str)
-    """
     by_id = {p["id"]: p for p in r32_partidos}
 
     def _info(pid):
         p = by_id.get(pid)
         if not p:
-            return {"t1": "TBD", "t2": "TBD", "pred": [1, 1], "p1": 50, "p2": 50, "real": None, "winner": "TBD"}
+            return {"t1": "TBD", "t2": "TBD", "pred": [1, 1], "p1": 50, "p2": 50, "real": None, "penaltis": None, "winner": "TBD"}
         stored = get_almacen_result(pid)
         real = stored.get("real") if stored else None
+        penaltis = stored.get("penaltis") if stored else None
         pred, p1, p2, pred_winner = get_pred(p["local"], p["visitante"])
-        if real and real[0] > real[1]:
+        if penaltis == "local":
+            winner = p["local"]
+        elif penaltis == "visitante":
+            winner = p["visitante"]
+        elif real and real[0] > real[1]:
             winner = p["local"]
         elif real and real[1] > real[0]:
             winner = p["visitante"]
         else:
             winner = pred_winner if pred_winner else p["local"]
-        return {"t1": p["local"], "t2": p["visitante"], "pred": pred, "p1": p1, "p2": p2, "real": real, "winner": winner}
+        return {"t1": p["local"], "t2": p["visitante"], "pred": pred, "p1": p1, "p2": p2, "real": real, "penaltis": penaltis, "winner": winner}
 
     def _future(t1, t2):
         if not t1 or not t2 or t1 == "TBD" or t2 == "TBD":
-            return {"t1": t1 or "TBD", "t2": t2 or "TBD", "pred": [1, 1], "p1": 0, "p2": 0, "real": None, "winner": "TBD"}
+            return {"t1": t1 or "TBD", "t2": t2 or "TBD", "pred": [1, 1], "p1": 0, "p2": 0, "real": None, "penaltis": None, "winner": "TBD"}
         pred, p1, p2, winner = get_pred(t1, t2)
-        return {"t1": t1, "t2": t2, "pred": pred, "p1": p1, "p2": p2, "real": None, "winner": winner}
+        return {"t1": t1, "t2": t2, "pred": pred, "p1": p1, "p2": p2, "real": None, "penaltis": None, "winner": winner}
 
-    # R32
     r32_left  = [(_info(a), _info(b)) for a, b in BRACKET_LEFT]
     r32_right = [(_info(a), _info(b)) for a, b in BRACKET_RIGHT]
-
-    # R16
     r16_left  = [_future(m1["winner"], m2["winner"]) for m1, m2 in r32_left]
     r16_right = [_future(m1["winner"], m2["winner"]) for m1, m2 in r32_right]
-
-    # Cuartos
-    qf_left  = [_future(r16_left[i]["winner"],  r16_left[i+1]["winner"])  for i in range(0, 4, 2)]
-    qf_right = [_future(r16_right[i]["winner"], r16_right[i+1]["winner"]) for i in range(0, 4, 2)]
-
-    # Semis
-    sf_left  = _future(qf_left[0]["winner"],  qf_left[1]["winner"])
-    sf_right = _future(qf_right[0]["winner"], qf_right[1]["winner"])
-
-    # Final
-    final = _future(sf_left["winner"], sf_right["winner"])
+    qf_left   = [_future(r16_left[i]["winner"],  r16_left[i+1]["winner"])  for i in range(0, 4, 2)]
+    qf_right  = [_future(r16_right[i]["winner"], r16_right[i+1]["winner"]) for i in range(0, 4, 2)]
+    sf_left   = _future(qf_left[0]["winner"],  qf_left[1]["winner"])
+    sf_right  = _future(qf_right[0]["winner"], qf_right[1]["winner"])
+    final     = _future(sf_left["winner"], sf_right["winner"])
 
     def _box(m):
-        return _match_box(m["t1"], m["t2"], m["pred"], m["p1"], m["p2"], m["real"], m["winner"])
+        return _match_box(m["t1"], m["t2"], m["pred"], m["p1"], m["p2"], m["real"], m["winner"], m.get("penaltis"))
 
-    # Build column boxes
     r32L_boxes = []
     for m1, m2 in r32_left:
         r32L_boxes.append(_box(m1))
         r32L_boxes.append(_box(m2))
-
     r16L_boxes = [_box(m) for m in r16_left]
     qfL_boxes  = [_box(m) for m in qf_left]
     sfL_box    = [_box(sf_left)]
@@ -168,12 +154,10 @@ def generar_html_llave(r32_partidos, get_almacen_result, get_pred):
     for m1, m2 in r32_right:
         r32R_boxes.append(_box(m1))
         r32R_boxes.append(_box(m2))
-
     r16R_boxes = [_box(m) for m in r16_right]
     qfR_boxes  = [_box(m) for m in qf_right]
     sfR_box    = [_box(sf_right)]
 
-    # Final box
     final_t1 = _abrev(final["t1"]) if final["t1"] != "TBD" else "?"
     final_t2 = _abrev(final["t2"]) if final["t2"] != "TBD" else "?"
     pred_f   = str(final["pred"][0]) + "–" + str(final["pred"][1]) if final["t1"] != "TBD" else "?"
@@ -187,8 +171,7 @@ def generar_html_llave(r32_partidos, get_almacen_result, get_pred):
         + "<div style='color:#3ddc84;font-weight:700;font-size:.8rem;margin-bottom:4px'>" + win_f + "</div>"
         + "<div style='color:#7d8a99;font-size:.7rem'>" + final_t1 + " vs " + final_t2 + "</div>"
         + "<div style='color:#9aa7b4;font-size:.65rem;margin-top:2px'>pred: " + pred_f + "</div>"
-        + "</div>"
-        + "</div>"
+        + "</div></div>"
     )
 
     GAP = {32: 2, 16: 18, 8: 52, 4: 160}
@@ -212,5 +195,4 @@ def generar_html_llave(r32_partidos, get_almacen_result, get_pred):
         + "</div>"
         + "</div>"
     )
-
     return html
