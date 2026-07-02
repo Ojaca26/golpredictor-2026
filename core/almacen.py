@@ -45,6 +45,16 @@ def set_resultado_manual(partido_id: int, goles_local: int, goles_visit: int) ->
     })
 
 
+def set_penal(partido_id: int, ganador: str) -> None:
+    """
+    Guarda quién ganó una definición por penales en un cruce de eliminatoria.
+    ganador debe ser "local" o "visitante".
+    """
+    if ganador not in ("local", "visitante"):
+        return
+    set_prediccion(partido_id, {"penaltis": ganador})
+
+
 def get_todos_resultados() -> Dict[int, Tuple[int, int]]:
     """
     Retorna {partido_id: (goles_local, goles_visit)} para todos los partidos
@@ -57,6 +67,23 @@ def get_todos_resultados() -> Dict[int, Tuple[int, int]]:
         if real and len(real) == 2:
             try:
                 out[int(k)] = (int(real[0]), int(real[1]))
+            except (ValueError, TypeError):
+                pass
+    return out
+
+
+def get_todos_penaltis() -> Dict[int, str]:
+    """
+    Retorna {partido_id: "local"|"visitante"} para los cruces de eliminatoria
+    que terminaron empatados y se resolvieron por penales.
+    """
+    datos = cargar()
+    out: Dict[int, str] = {}
+    for k, v in datos.items():
+        pen = v.get("penaltis")
+        if pen in ("local", "visitante"):
+            try:
+                out[int(k)] = pen
             except (ValueError, TypeError):
                 pass
     return out

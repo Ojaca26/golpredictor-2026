@@ -5,19 +5,26 @@ Simulacion Monte Carlo del Mundial 2026.
 Flujo:
   1. Fase de grupos: para partidos YA JUGADOS usa el marcador real;
      solo simula los pendientes.
-  2. Eliminatorias: bracket estandar hasta la final.
+  2. Eliminatorias: bracket estandar hasta la final. Para cruces YA JUGADOS
+     (con resultado real o definicion por penales) usa el ganador real en
+     vez de simularlo — asi el bracket profundo (octavos, cuartos, semis)
+     siempre parte de quien REALMENTE avanzo, no de una proyeccion vieja.
   3. Estadisticas: % de veces que cada equipo clasifica, semis, final, campeon.
 
 Parametros nuevos en simular_torneo():
   resultados_reales  — {partido_id: (goles_local, goles_visit)}
   fuerzas_bayes      — {equipo: FuerzaEquipo} ajustadas por Bayes post-torneo
+  penaltis_reales    — {partido_id: "local"|"visitante"} para cruces de
+                        eliminatoria que terminaron empatados y se
+                        definieron por penales (el marcador real por si
+                        solo no alcanza para saber quien avanza).
 """
 
 from __future__ import annotations
 import math
 import random
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, FrozenSet, List, Optional, Tuple
 
 from core.equipos import get_fuerza
 from core.predictor import FuerzaEquipo
@@ -113,10 +120,58 @@ def _construir_partidos_grupo(
 
 
 # ---------------------------------------------------------------------------
-# Eliminatorias
+# Eliminatorias — ganadores reales conocidos
 # ---------------------------------------------------------------------------
+def _construir_ganadores_conocidos(
+    partidos: List[dict],
+    resultados_reales: Dict[int, Tuple[int, int]],
+    penaltis_reales: Optional[Dict[int, str]] = None,
+) -> Dict[FrozenSet[str], str]:
+    """
+    Recorre los partidos de eliminatoria (fase != "grupos") que ya tienen
+    resultado real y devuelve {frozenset({local, visitante}): equipo_ganador}.
+
+    Si el marcador real es empate, solo se resuelve el ganador si hay un
+    registro de penales (penaltis_reales); si no, el cruce se deja para que
+    el Monte Carlo lo siga simulando (no inventamos un ganador de penales).
+    """
+    penaltis_reales = penaltis_reales or {}
+    ganadores: Dict[FrozenSet[str], str] = {}
+
+    for p in partidos:
+        if p.get("fase", "grupos") == "grupos":
+            continue
+        pid = p.get("id")
+        real = resultados_reales.get(pid)
+        if real is None:
+            continue
+        loc, vis = p["local"], p["visitante"]
+        gl, gv = real
+        if gl > gv:
+            ganador = loc
+        elif gv > gl:
+            ganador = vis
+        else:
+            pen = penaltis_reales.get(pid)
+            if pen == "local":
+                ganador = loc
+            elif pen == "visitante":
+                ganador = vis
+            else:
+                # Empate sin penal registrado: no forzamos un ganador.
+                continue
+        ganadores[frozenset((loc, vis))] = ganador
+
+    return ganadores
+
+
 def _ganador_partido(a: str, b: str,
-                     fuerzas: Optional[Dict[str, FuerzaEquipo]] = None) -> str:
+                     fuerzas: Optional[Dict[str, FuerzaEquipo]] = None,
+                     ganadores_conocidos: Optional[Dict[FrozenSet[str], str]] = None) -> str:
+    if ganadores_conocidos:
+        real = ganadores_conocidos.get(frozenset((a, b)))
+        if real is not None:
+            return real
     gl, gv = _simular_goles(a, b, fuerzas)
     if gl > gv:   return a
     elif gv > gl: return b
@@ -124,7 +179,8 @@ def _ganador_partido(a: str, b: str,
 
 
 def _simular_bracket(clasificados: List[str],
-                     fuerzas: Optional[Dict[str, FuerzaEquipo]] = None) -> Dict[str, str]:
+                     fuerzas: Optional[Dict[str, FuerzaEquipo]] = None,
+                     ganadores_conocidos: Optional[Dict[FrozenSet[str], str]] = None) -> Dict[str, str]:
     logros: Dict[str, str] = {}
     ronda = list(clasificados)
     nombres = {32: "dieciseisavos", 16: "octavos", 8: "cuartos", 4: "semis", 2: "final"}
@@ -136,7 +192,7 @@ def _simular_bracket(clasificados: List[str],
             logros[e] = etapa
         siguiente = []
         for i in range(0, n, 2):
-            ganador = (_ganador_partido(ronda[i], ronda[i + 1], fuerzas)
+            ganador = (_ganador_partido(ronda[i], ronda[i + 1], fuerzas, ganadores_conocidos)
                        if i + 1 < n else ronda[i])
             siguiente.append(ganador)
         ronda = siguiente
@@ -154,6 +210,7 @@ def simular_torneo(
     n_sims:            int = 5000,
     resultados_reales: Optional[Dict[int, Tuple[int, int]]] = None,
     fuerzas_bayes:     Optional[Dict[str, FuerzaEquipo]]    = None,
+    penaltis_reales:   Optional[Dict[int, str]]             = None,
 ) -> Dict[str, Dict[str, float]]:
     """
     Simula el torneo n_sims veces.
@@ -163,6 +220,8 @@ def simular_torneo(
         n_sims            — número de simulaciones.
         resultados_reales — {id_partido: (gl, gv)} ya jugados (no se simulan).
         fuerzas_bayes     — {equipo: FuerzaEquipo} actualizadas por Bayes.
+        penaltis_reales   — {id_partido: "local"|"visitante"} para cruces de
+                             eliminatoria empatados y resueltos por penales.
 
     Retorna:
         {equipo: {"clasifica": p, "octavos": p, "cuartos": p,
@@ -198,6 +257,11 @@ def simular_torneo(
             grupos_fixture[g], resultados_reales, equipos
         )
 
+    # ── 2b. Ganadores reales ya conocidos en eliminatorias ───────────────────
+    ganadores_conocidos = _construir_ganadores_conocidos(
+        partidos, resultados_reales, penaltis_reales
+    )
+
     # ── 3. Simulaciones ─────────────────────────────────────────────────────
     conteos: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
@@ -227,7 +291,7 @@ def simular_torneo(
             bracket.append(bracket[-1])
         bracket = bracket[:16]
 
-        logros = _simular_bracket(bracket, fuerzas)
+        logros = _simular_bracket(bracket, fuerzas, ganadores_conocidos)
         for equipo, etapa in logros.items():
             conteos[equipo][etapa] += 1
 
