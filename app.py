@@ -198,9 +198,6 @@ def calcular_partido(p: dict) -> dict:
     return pred_res
 
 
-# ---------------------------------------------------------------------------
-# Render: agrupar por fecha y mostrar con scroll
-# ---------------------------------------------------------------------------
 MESES = ["", "ene", "feb", "mar", "abr", "may", "jun",
          "jul", "ago", "sep", "oct", "nov", "dic"]
 
@@ -381,7 +378,10 @@ with st.expander("🎲 Simulacion Monte Carlo del torneo", expanded=True):
 st.markdown("---")
 
 # ---------------------------------------------------------------------------
-# Llave del torneo (R32 → Final)
+# Llave del torneo (R32 → Final) — única vista de partidos individuales.
+# La fase de grupos y la lista partido-por-partido ya no se muestran aquí;
+# los marcadores reales de la fase de grupos siguen intactos en
+# data/predicciones.json y se siguen usando para Bayes / Monte Carlo / Llave.
 # ---------------------------------------------------------------------------
 with st.expander("🏆 Llave del torneo — 1/16 a Final", expanded=True):
     _r32_partidos = sorted(
@@ -431,256 +431,12 @@ with st.expander("🏆 Llave del torneo — 1/16 a Final", expanded=True):
                     st.markdown(f"<span class='meta'>{msg}</span>", unsafe_allow_html=True)
 
 st.markdown("---")
-
-# ---------------------------------------------------------------------------
-# Lista de partidos — la fase de grupos (ronda 1) se oculta por defecto.
-# Los resultados reales de esos partidos siguen intactos en la base de datos
-# (data/predicciones.json) y se siguen usando en Bayes / Monte Carlo / Llave;
-# esto solo afecta qué se dibuja en esta lista.
-# ---------------------------------------------------------------------------
-_col_f1, _col_f2 = st.columns([1, 3])
-with _col_f1:
-    mostrar_grupos = st.toggle("Mostrar fase de grupos (ronda 1)", value=False)
-
-_partidos_lista = partidos if mostrar_grupos else [p for p in partidos if _es_eliminatoria(p)]
-
-por_fecha = defaultdict(list)
-for p in _partidos_lista:
-    por_fecha[p.get("fecha", "Sin fecha")].append(p)
-
-st.markdown(f"<span class='meta'>Mostrando {len(_partidos_lista)} de {len(partidos)} partidos · "
-            f"{sum(1 for p in partidos if almacen.get_prediccion(p['id']).get('real'))} con resultado real en total</span>",
-            unsafe_allow_html=True)
-
-for fecha in sorted(por_fecha.keys()):
-    st.markdown(f"<div class='bloque-fecha'>{fecha_bonita(fecha)}</div>",
-                unsafe_allow_html=True)
-
-    for p in por_fecha[fecha]:
-        guardado = almacen.get_prediccion(p["id"])
-        ya = f"pred_{p['id']}" in st.session_state
-
-        with st.container():
-            c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
-
-            # ── Columna 1: equipos + análisis base ─────────────────
-            with c1:
-                grupo = f" · Grupo {p['grupo']}" if p.get("grupo") else ""
-                sede  = f" · {p['sede']}"         if p.get("sede")  else ""
-                fase  = "Eliminatoria" if _es_eliminatoria(p) else "Grupos"
-                st.markdown(
-                    f"<div class='equipos'>{p['local']} "
-                    f"<span style='color:#8a97a6'>vs</span> {p['visitante']}</div>"
-                    f"<div class='meta'>{fase}{grupo}{sede}</div>",
-                    unsafe_allow_html=True,
-                )
-
-                # Fuerzas base (siempre visibles, sin necesidad de calcular)
-                fl = get_fuerza(p["local"])
-                fv = get_fuerza(p["visitante"])
-                with st.expander("📊 Análisis de la IA", expanded=False):
-                    if ya:
-                        r = st.session_state[f"pred_{p['id']}"]
-                        # Fuerzas ajustadas
-                        fl = r.get("fuerza_local", fl)
-                        fv = r.get("fuerza_visitante", fv)
-                        if r.get("nota_ia"):
-                            st.markdown(r["nota_ia"])
-                        st.markdown(r.get("razonamiento", ""))
-                    else:
-                        st.markdown(razonamiento_fuerza(p["local"], p["visitante"]))
-
-                    col_fl, col_fv = st.columns(2)
-                    with col_fl:
-                        st.markdown(f"**{p['local']}**")
-                        st.markdown(f"<span class='meta'>Ataque: {fl.ataque:.2f}</span>",
-                                    unsafe_allow_html=True)
-                        st.markdown(_barra(fl.ataque), unsafe_allow_html=True)
-                        st.markdown(f"<span class='meta'>Defensa: {fl.defensa:.2f} "
-                                    f"({'débil' if fl.defensa>1.1 else 'sólida'})</span>",
-                                    unsafe_allow_html=True)
-                        st.markdown(_barra(fl.defensa, color="#c0392b"), unsafe_allow_html=True)
-                    with col_fv:
-                        st.markdown(f"**{p['visitante']}**")
-                        st.markdown(f"<span class='meta'>Ataque: {fv.ataque:.2f}</span>",
-                                    unsafe_allow_html=True)
-                        st.markdown(_barra(fv.ataque), unsafe_allow_html=True)
-                        st.markdown(f"<span class='meta'>Defensa: {fv.defensa:.2f} "
-                                    f"({'débil' if fv.defensa>1.1 else 'sólida'})</span>",
-                                    unsafe_allow_html=True)
-                        st.markdown(_barra(fv.defensa, color="#c0392b"), unsafe_allow_html=True)
-
-                    # ── Mapa de calor de probabilidades (solo si hay prediccion) ──
-                    if ya:
-                        r_hm = st.session_state[f"pred_{p['id']}"]
-                        fl_hm = r_hm.get("fuerza_local", fl)
-                        fv_hm = r_hm.get("fuerza_visitante", fv)
-                        predictor.fuerzas = {p["local"]: fl_hm, p["visitante"]: fv_hm}
-                        lam_l_hm, lam_v_hm = predictor._lambdas(p["local"], p["visitante"])
-                        M_hm = predictor.matriz_probabilidades(lam_l_hm, lam_v_hm)
-                        st.markdown(
-                            "<div style='margin-top:12px;color:#4a5a6b;font-size:.8rem;"
-                            "font-weight:600;letter-spacing:.5px'>MAPA DE PROBABILIDADES</div>",
-                            unsafe_allow_html=True,
-                        )
-                        st.markdown(_heatmap_html(M_hm, p["local"], p["visitante"]),
-                                    unsafe_allow_html=True)
-
-            # ── Columna 2 & 3: predicciones ───────────────
-            if not ya:
-                # Distribución rápida con fuerzas base FIFA (sin IA, cálculo instantáneo)
-                _fb = st.session_state.get("fuerzas_bayes", {})
-                _fl_q = _fb.get(p["local"],      get_fuerza(p["local"]))
-                _fv_q = _fb.get(p["visitante"],  get_fuerza(p["visitante"]))
-                predictor.fuerzas = {p["local"]: _fl_q, p["visitante"]: _fv_q}
-                _reglas_q = Reglas.eliminatorias() if _es_eliminatoria(p) else Reglas.primera_ronda()
-                _qr    = predictor.top_dos_pronosticos(p["local"], p["visitante"], _reglas_q)
-                _pred_q = _qr["prediccion"]
-                _o1q   = _qr["opcion_1"]
-                _p_emp = _pred_q.prob_empate
-
-                with c2:
-                    _m1 = _o1q["marcador"]
-                    st.markdown(
-                        f"<div class='pred-1' style='color:#4a5a6b'>{_m1[0]} – {_m1[1]}</div>"
-                        f"<div class='meta'>📊 Base FIFA · {_o1q['prob']*100:.1f}% · "
-                        f"<span class='chip chip-pts'>{_o1q['pts_esperados']:.1f} pts esp.</span></div>",
-                        unsafe_allow_html=True,
-                    )
-                with c3:
-                    _alerta = (
-                        "<div style='color:#b8860b;font-weight:700;font-size:.8rem;"
-                        "margin-top:4px'>⚠️ Riesgo empate alto</div>"
-                        if _p_emp > 0.27 else ""
-                    )
-                    st.markdown(
-                        f"<div class='meta'>"
-                        f"<span class='chip chip-azul'>1: {_pred_q.prob_victoria_local*100:.0f}%</span> "
-                        f"<span class='chip chip-azul'>X: {_p_emp*100:.0f}%</span> "
-                        f"<span class='chip chip-azul'>2: {_pred_q.prob_victoria_visit*100:.0f}%</span>"
-                        f"</div>{_alerta}",
-                        unsafe_allow_html=True,
-                    )
-                    if st.button("🧮 Calcular IA", key=f"btn_{p['id']}"):
-                        with st.spinner("Analizando..."):
-                            calcular_partido(p)
-                        st.rerun()
-            else:
-                r = st.session_state[f"pred_{p['id']}"]
-                o1, o2 = r["opcion_1"], r["opcion_2"]
-                pred = r["prediccion"]
-                with c2:
-                    st.markdown(
-                        f"<div class='pred-1'>{o1['marcador'][0]} – {o1['marcador'][1]}</div>"
-                        f"<div class='meta'>📊 Más probable · {o1['prob']*100:.1f}% · "
-                        f"<span class='chip chip-pts'>{o1['pts_esperados']:.1f} pts esp.</span></div>",
-                        unsafe_allow_html=True,
-                    )
-                with c3:
-                    st.markdown(
-                        f"<div class='pred-2'>{o2['marcador'][0]} – {o2['marcador'][1]}</div>"
-                        f"<div class='meta'>🎯 Óptimo puntos · {o2['prob']*100:.1f}% · "
-                        f"<span class='chip chip-pts'>{o2['pts_esperados']:.1f} pts esp.</span></div>"
-                        f"<div class='meta'>"
-                        f"<span class='chip chip-azul'>1: {pred.prob_victoria_local*100:.0f}%</span> "
-                        f"<span class='chip chip-azul'>X: {pred.prob_empate*100:.0f}%</span> "
-                        f"<span class='chip chip-azul'>2: {pred.prob_victoria_visit*100:.0f}%</span>"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-
-            # ── Columna 4: marcador real + puntos ─────────
-            with c4:
-                real = guardado.get("real")
-                if real:
-                    # RESULTADO BLOQUEADO — no se puede editar
-                    rl, rv = real
-                    etiqueta = "🔒 Oficial" if guardado.get("manual") else "🔒 Marcador real"
-                    st.markdown(
-                        f"<div class='real-ok'>{rl} – {rv}</div>"
-                        f"<div class='meta'>{etiqueta}</div>",
-                        unsafe_allow_html=True,
-                    )
-                    if _es_eliminatoria(p) and rl == rv and not guardado.get("penaltis"):
-                        st.markdown(
-                            "<div class='meta' style='color:#b8860b;font-weight:600'>"
-                            "🥅 Empate — ¿quién avanzó por penales?</div>",
-                            unsafe_allow_html=True,
-                        )
-                        _cp1, _cp2 = st.columns(2)
-                        if _cp1.button(f"{p['local'][:10]}", key=f"pen_l_{p['id']}"):
-                            almacen.set_penal(p["id"], "local")
-                            st.cache_data.clear()
-                            st.rerun()
-                        if _cp2.button(f"{p['visitante'][:10]}", key=f"pen_v_{p['id']}"):
-                            almacen.set_penal(p["id"], "visitante")
-                            st.cache_data.clear()
-                            st.rerun()
-                    if ya:
-                        an = analizar_resultado(
-                            st.session_state[f"pred_{p['id']}"]["opcion_1"]["marcador"],
-                            (rl, rv), _es_eliminatoria(p),
-                        )
-                        st.markdown(
-                            f"<div class='meta'>{an['veredicto']}<br>"
-                            f"<span class='chip chip-pts'>{an['puntos']}/{an['max_posible']} pts</span></div>",
-                            unsafe_allow_html=True,
-                        )
-                else:
-                    # Determinar si el partido ya debería haberse jugado
-                    try:
-                        _fecha_p = dt.date.fromisoformat(p.get("fecha", "9999-12-31"))
-                    except Exception:
-                        _fecha_p = dt.date(9999, 12, 31)
-                    _hoy = dt.date.today()
-
-                    if _fecha_p <= _hoy:
-                        # Partido pasado — permitir ingreso manual
-                        st.markdown(
-                            "<div class='meta' style='color:#b8860b;font-weight:600'>"
-                            "📝 Ingresar resultado:</div>",
-                            unsafe_allow_html=True,
-                        )
-                        with st.form(f"form_real_{p['id']}", clear_on_submit=True):
-                            _cc1, _cc2 = st.columns(2)
-                            _gl_m = _cc1.number_input(
-                                p["local"][:9], min_value=0, max_value=20,
-                                value=0, step=1, key=f"gl_{p['id']}"
-                            )
-                            _gv_m = _cc2.number_input(
-                                p["visitante"][:9], min_value=0, max_value=20,
-                                value=0, step=1, key=f"gv_{p['id']}"
-                            )
-                            if st.form_submit_button("Guardar"):
-                                almacen.set_resultado_manual(p["id"], int(_gl_m), int(_gv_m))
-                                # Invalidar Bayes para recalcular con nuevo resultado
-                                if "fuerzas_bayes" in st.session_state:
-                                    del st.session_state["fuerzas_bayes"]
-                                st.cache_data.clear()
-                                st.rerun()
-                        # También ofrecer búsqueda automática
-                        if st.button("🔍 Buscar auto", key=f"res_{p['id']}"):
-                            with st.spinner("Buscando..."):
-                                r = obtener_resultado_real(
-                                    p["local"], p["visitante"], p.get("fecha", ""),
-                                    KEYS["apifootball"], KEYS["footballdata"],
-                                    KEYS["tavily"], KEYS["serper"],
-                                )
-                            if r:
-                                almacen.set_prediccion(p["id"], {"real": list(r)})
-                                if "fuerzas_bayes" in st.session_state:
-                                    del st.session_state["fuerzas_bayes"]
-                                st.cache_data.clear()
-                                st.rerun()
-                            else:
-                                st.toast("Sin resultado confiable aún.")
-                    else:
-                        # Partido futuro
-                        st.markdown("<div class='real-pend'>⏳ pendiente</div>",
-                                    unsafe_allow_html=True)
-
-        st.markdown("<hr style='border:0;border-top:1px solid #e2e8f0;margin:4px 0'>",
-                    unsafe_allow_html=True)
+st.markdown(
+    f"<span class='meta'>{sum(1 for p in partidos if almacen.get_prediccion(p['id']).get('real'))} "
+    f"de {len(partidos)} partidos con resultado real registrado en total "
+    f"(fase de grupos incluida, aunque no se muestre arriba).</span>",
+    unsafe_allow_html=True,
+)
 
 
 # ---------------------------------------------------------------------------
