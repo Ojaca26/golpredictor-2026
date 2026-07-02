@@ -40,7 +40,7 @@ h2{text-align:center;color:#0d2b52;letter-spacing:2px;font-size:1rem;margin-bott
 .team .tpct{font-size:.6rem;color:#8a97a6;margin-left:4px}
 .divider{border-top:1px solid #dbe6f2;border-bottom:1px solid #dbe6f2;margin:2px 0;padding:2px 0;text-align:center;font-size:.7rem}
 .pred-sc{color:#5a6b7d}
-.real-sc{color:#b8860b;font-weight:700;margin-left:4px}
+.real-sc{color:#0d2b52;font-weight:700;margin-left:4px}
 .final-col{display:flex;flex-direction:column;align-items:center;margin:0 8px}
 .final-label{color:#0d2b52;font-size:.65rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
 .final-box{background:#e3edf9;border:1.5px solid #1a4d8f;border-radius:6px;padding:6px 10px;min-width:140px;text-align:center}
