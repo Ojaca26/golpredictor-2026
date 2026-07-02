@@ -57,30 +57,30 @@ KEYS = {
 
 
 # ---------------------------------------------------------------------------
-# Estilo visual — sala táctica (verde césped sobre pizarra)
+# Estilo visual — fondo claro, texto azul oscuro
 # ---------------------------------------------------------------------------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
-.stApp { background: #0f1419; }
-h1, h2, h3 { font-family: 'Barlow Condensed', sans-serif !important; letter-spacing: .5px; }
+.stApp { background: #ffffff; }
+h1, h2, h3 { font-family: 'Barlow Condensed', sans-serif !important; letter-spacing: .5px; color: #0d2b52; }
 .bloque-fecha {
   font-family: 'Barlow Condensed', sans-serif; font-size: 1.3rem; font-weight: 700;
-  color: #3ddc84; text-transform: uppercase; letter-spacing: 2px;
-  border-bottom: 1px solid #2a3340; padding: 14px 0 6px; margin-top: 18px;
+  color: #0d2b52; text-transform: uppercase; letter-spacing: 2px;
+  border-bottom: 1px solid #d7e0ea; padding: 14px 0 6px; margin-top: 18px;
 }
-.equipos { font-family:'Barlow Condensed',sans-serif; font-size:1.35rem; font-weight:600; color:#eef2f6; }
-.meta { color:#7d8a99; font-size:.8rem; font-family:'Inter',sans-serif; }
-.pred-1 { color:#3ddc84; font-weight:700; font-size:1.5rem; font-family:'Barlow Condensed',sans-serif; }
-.pred-2 { color:#9aa7b4; font-weight:600; font-size:1.15rem; font-family:'Barlow Condensed',sans-serif; }
-.real-pend { color:#5a6776; font-style:italic; }
-.real-ok { color:#ffd25a; font-weight:700; font-size:1.5rem; font-family:'Barlow Condensed',sans-serif; }
+.equipos { font-family:'Barlow Condensed',sans-serif; font-size:1.35rem; font-weight:600; color:#0d2b52; }
+.meta { color:#5a6b7d; font-size:.8rem; font-family:'Inter',sans-serif; }
+.pred-1 { color:#0d2b52; font-weight:700; font-size:1.5rem; font-family:'Barlow Condensed',sans-serif; }
+.pred-2 { color:#4a5a6b; font-weight:600; font-size:1.15rem; font-family:'Barlow Condensed',sans-serif; }
+.real-pend { color:#8a97a6; font-style:italic; }
+.real-ok { color:#b8860b; font-weight:700; font-size:1.5rem; font-family:'Barlow Condensed',sans-serif; }
 .chip { display:inline-block; padding:2px 9px; border-radius:20px; font-size:.72rem;
         font-family:'Inter',sans-serif; font-weight:600; }
-.chip-pts  { background:#13361f; color:#3ddc84; border:1px solid #1d5230; }
-.chip-azul { background:#0e2040; color:#6ab4ff; border:1px solid #1a3560; }
-.barra-wrap { background:#1e2a38; border-radius:4px; height:6px; width:100%; }
-.barra-fill { background:#3ddc84; border-radius:4px; height:6px; }
+.chip-pts  { background:#e3edf9; color:#0d2b52; border:1px solid #b8d4f0; }
+.chip-azul { background:#eef3fa; color:#1a4d8f; border:1px solid #c9dbf0; }
+.barra-wrap { background:#e2e8f0; border-radius:4px; height:6px; width:100%; }
+.barra-fill { background:#1a4d8f; border-radius:4px; height:6px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -201,10 +201,6 @@ def calcular_partido(p: dict) -> dict:
 # ---------------------------------------------------------------------------
 # Render: agrupar por fecha y mostrar con scroll
 # ---------------------------------------------------------------------------
-por_fecha = defaultdict(list)
-for p in partidos:
-    por_fecha[p.get("fecha", "Sin fecha")].append(p)
-
 MESES = ["", "ene", "feb", "mar", "abr", "may", "jun",
          "jul", "ago", "sep", "oct", "nov", "dic"]
 
@@ -217,7 +213,7 @@ def fecha_bonita(iso: str) -> str:
         return iso
 
 
-def _barra(val: float, max_val: float = 2.2, color: str = "#3ddc84") -> str:
+def _barra(val: float, max_val: float = 2.2, color: str = "#1a4d8f") -> str:
     pct = min(100, int(val / max_val * 100))
     return (f"<div class='barra-wrap'>"
             f"<div class='barra-fill' style='width:{pct}%;background:{color}'></div>"
@@ -230,29 +226,29 @@ def _heatmap_html(M, local: str, visitante: str, max_g: int = 5) -> str:
     rows = ["<table style='border-collapse:separate;border-spacing:2px;font-size:.72rem'>"]
     # Cabecera: goles visitante
     rows.append("<tr>")
-    rows.append("<td style='color:#5a6776;padding:3px 6px;font-size:.65rem'>LOC\\ VIS</td>")
+    rows.append("<td style='color:#8a97a6;padding:3px 6px;font-size:.65rem'>LOC\\ VIS</td>")
     for j in range(max_g + 1):
         rows.append(
-            f"<td style='color:#6ab4ff;text-align:center;padding:3px 8px;"
+            f"<td style='color:#1a4d8f;text-align:center;padding:3px 8px;"
             f"font-weight:700'>{j}</td>"
         )
     rows.append("</tr>")
     for i in range(max_g + 1):
         rows.append("<tr>")
         rows.append(
-            f"<td style='color:#3ddc84;padding:3px 6px;font-weight:700'>{i}</td>"
+            f"<td style='color:#0d2b52;padding:3px 6px;font-weight:700'>{i}</td>"
         )
         for j in range(max_g + 1):
             prob = M[i][j]
             pct = prob * 100
             intens = (prob / max_prob) if max_prob > 0 else 0
-            # Gradiente oscuro -> verde brillante
-            r_c = int(15 + intens * (61 - 15))
-            g_c = int(42 + intens * (220 - 42))
-            b_c = int(25 + intens * (132 - 25))
+            # Gradiente blanco -> azul oscuro
+            r_c = int(255 - intens * (255 - 13))
+            g_c = int(255 - intens * (255 - 43))
+            b_c = int(255 - intens * (255 - 82))
             bg = f"rgb({r_c},{g_c},{b_c})"
-            txt = "#eef2f6" if intens > 0.45 else "#7d8a99"
-            border = "1px solid #3ddc84" if i == j else "1px solid #1e2a38"
+            txt = "#ffffff" if intens > 0.45 else "#3a4a5a"
+            border = "1px solid #1a4d8f" if i == j else "1px solid #e2e8f0"
             rows.append(
                 f"<td style='background:{bg};color:{txt};text-align:center;"
                 f"padding:4px 7px;border-radius:4px;border:{border}'>"
@@ -261,7 +257,7 @@ def _heatmap_html(M, local: str, visitante: str, max_g: int = 5) -> str:
         rows.append("</tr>")
     rows.append("</table>")
     rows.append(
-        f"<div style='color:#5a6776;font-size:.65rem;margin-top:3px'>"
+        f"<div style='color:#8a97a6;font-size:.65rem;margin-top:3px'>"
         f"Filas = goles {local} &nbsp;|&nbsp; Columnas = goles {visitante} "
         f"&nbsp;|&nbsp; Diagonal = empate</div>"
     )
@@ -307,8 +303,8 @@ with st.expander("🎲 Simulacion Monte Carlo del torneo", expanded=True):
             _bayes_lbl = len(st.session_state.get("fuerzas_bayes", {}))
             st.markdown(
                 f"<span class='meta'>{mc_n:,} simulaciones · "
-                f"<span style='color:#ffd25a'>{_fijos_lbl} partidos con resultado real fijo</span> · "
-                f"<span style='color:#3ddc84'>Bayes: {_bayes_lbl} equipos ajustados</span></span>",
+                f"<span style='color:#b8860b'>{_fijos_lbl} partidos con resultado real fijo</span> · "
+                f"<span style='color:#1a4d8f'>Bayes: {_bayes_lbl} equipos ajustados</span></span>",
                 unsafe_allow_html=True,
             )
 
@@ -331,11 +327,11 @@ with st.expander("🎲 Simulacion Monte Carlo del torneo", expanded=True):
 
             # Cabecera
             header_cols = st.columns([2] + [1] * len(etapas))
-            header_cols[0].markdown("<span style='color:#7d8a99;font-size:.75rem'>EQUIPO</span>",
+            header_cols[0].markdown("<span style='color:#5a6b7d;font-size:.75rem'>EQUIPO</span>",
                                     unsafe_allow_html=True)
             for idx, (_, label) in enumerate(etapas):
                 header_cols[idx + 1].markdown(
-                    f"<span style='color:#7d8a99;font-size:.75rem'>{label}</span>",
+                    f"<span style='color:#5a6b7d;font-size:.75rem'>{label}</span>",
                     unsafe_allow_html=True,
                 )
 
@@ -343,26 +339,26 @@ with st.expander("🎲 Simulacion Monte Carlo del torneo", expanded=True):
             for equipo, datos in equipos_ord[:20]:
                 row_cols = st.columns([2] + [1] * len(etapas))
                 row_cols[0].markdown(
-                    f"<span style='color:#eef2f6;font-size:.85rem'>{equipo}</span>",
+                    f"<span style='color:#0d2b52;font-size:.85rem'>{equipo}</span>",
                     unsafe_allow_html=True,
                 )
                 for idx, (clave, _) in enumerate(etapas):
                     val = datos.get(clave, 0)
                     if val > 0:
-                        color = "#3ddc84" if val > 0.3 else ("#ffd25a" if val > 0.1 else "#9aa7b4")
+                        color = "#1a4d8f" if val > 0.3 else ("#b8860b" if val > 0.1 else "#5a6b7d")
                         row_cols[idx + 1].markdown(
                             f"<span style='color:{color};font-size:.85rem'>{val*100:.0f}%</span>",
                             unsafe_allow_html=True,
                         )
                     else:
                         row_cols[idx + 1].markdown(
-                            "<span style='color:#2a3340;font-size:.85rem'>—</span>",
+                            "<span style='color:#c2cad4;font-size:.85rem'>—</span>",
                             unsafe_allow_html=True,
                         )
 
             # Podio top 5 campeons
             st.markdown(
-                "<div style='margin-top:16px;color:#3ddc84;font-size:.9rem;"
+                "<div style='margin-top:16px;color:#0d2b52;font-size:.9rem;"
                 "font-weight:600;letter-spacing:.5px'>FAVORITOS AL TITULO</div>",
                 unsafe_allow_html=True,
             )
@@ -371,11 +367,11 @@ with st.expander("🎲 Simulacion Monte Carlo del torneo", expanded=True):
             medallas = ["🥇", "🥈", "🥉", "4o", "5o"]
             for idx, (equipo, prob) in enumerate(podio):
                 p_cols[idx].markdown(
-                    f"<div style='text-align:center;background:#0e1c2a;border-radius:8px;"
-                    f"padding:10px 4px;border:1px solid #1e2a38'>"
+                    f"<div style='text-align:center;background:#f5f8fc;border-radius:8px;"
+                    f"padding:10px 4px;border:1px solid #dbe6f2'>"
                     f"<div style='font-size:1.4rem'>{medallas[idx]}</div>"
-                    f"<div style='color:#eef2f6;font-size:.85rem;font-weight:600'>{equipo}</div>"
-                    f"<div style='color:#3ddc84;font-size:1.1rem;font-weight:700'>{prob*100:.1f}%</div>"
+                    f"<div style='color:#0d2b52;font-size:.85rem;font-weight:600'>{equipo}</div>"
+                    f"<div style='color:#1a4d8f;font-size:1.1rem;font-weight:700'>{prob*100:.1f}%</div>"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
@@ -435,8 +431,25 @@ with st.expander("🏆 Llave del torneo — 1/16 a Final", expanded=True):
                     st.markdown(f"<span class='meta'>{msg}</span>", unsafe_allow_html=True)
 
 st.markdown("---")
-st.markdown(f"<span class='meta'>Mostrando {len(partidos)} partidos · "
-            f"{sum(1 for p in partidos if almacen.get_prediccion(p['id']).get('real'))} con resultado real</span>",
+
+# ---------------------------------------------------------------------------
+# Lista de partidos — la fase de grupos (ronda 1) se oculta por defecto.
+# Los resultados reales de esos partidos siguen intactos en la base de datos
+# (data/predicciones.json) y se siguen usando en Bayes / Monte Carlo / Llave;
+# esto solo afecta qué se dibuja en esta lista.
+# ---------------------------------------------------------------------------
+_col_f1, _col_f2 = st.columns([1, 3])
+with _col_f1:
+    mostrar_grupos = st.toggle("Mostrar fase de grupos (ronda 1)", value=False)
+
+_partidos_lista = partidos if mostrar_grupos else [p for p in partidos if _es_eliminatoria(p)]
+
+por_fecha = defaultdict(list)
+for p in _partidos_lista:
+    por_fecha[p.get("fecha", "Sin fecha")].append(p)
+
+st.markdown(f"<span class='meta'>Mostrando {len(_partidos_lista)} de {len(partidos)} partidos · "
+            f"{sum(1 for p in partidos if almacen.get_prediccion(p['id']).get('real'))} con resultado real en total</span>",
             unsafe_allow_html=True)
 
 for fecha in sorted(por_fecha.keys()):
@@ -457,7 +470,7 @@ for fecha in sorted(por_fecha.keys()):
                 fase  = "Eliminatoria" if _es_eliminatoria(p) else "Grupos"
                 st.markdown(
                     f"<div class='equipos'>{p['local']} "
-                    f"<span style='color:#5a6776'>vs</span> {p['visitante']}</div>"
+                    f"<span style='color:#8a97a6'>vs</span> {p['visitante']}</div>"
                     f"<div class='meta'>{fase}{grupo}{sede}</div>",
                     unsafe_allow_html=True,
                 )
@@ -486,7 +499,7 @@ for fecha in sorted(por_fecha.keys()):
                         st.markdown(f"<span class='meta'>Defensa: {fl.defensa:.2f} "
                                     f"({'débil' if fl.defensa>1.1 else 'sólida'})</span>",
                                     unsafe_allow_html=True)
-                        st.markdown(_barra(fl.defensa, color="#e05a5a"), unsafe_allow_html=True)
+                        st.markdown(_barra(fl.defensa, color="#c0392b"), unsafe_allow_html=True)
                     with col_fv:
                         st.markdown(f"**{p['visitante']}**")
                         st.markdown(f"<span class='meta'>Ataque: {fv.ataque:.2f}</span>",
@@ -495,7 +508,7 @@ for fecha in sorted(por_fecha.keys()):
                         st.markdown(f"<span class='meta'>Defensa: {fv.defensa:.2f} "
                                     f"({'débil' if fv.defensa>1.1 else 'sólida'})</span>",
                                     unsafe_allow_html=True)
-                        st.markdown(_barra(fv.defensa, color="#e05a5a"), unsafe_allow_html=True)
+                        st.markdown(_barra(fv.defensa, color="#c0392b"), unsafe_allow_html=True)
 
                     # ── Mapa de calor de probabilidades (solo si hay prediccion) ──
                     if ya:
@@ -506,14 +519,14 @@ for fecha in sorted(por_fecha.keys()):
                         lam_l_hm, lam_v_hm = predictor._lambdas(p["local"], p["visitante"])
                         M_hm = predictor.matriz_probabilidades(lam_l_hm, lam_v_hm)
                         st.markdown(
-                            "<div style='margin-top:12px;color:#9aa7b4;font-size:.8rem;"
+                            "<div style='margin-top:12px;color:#4a5a6b;font-size:.8rem;"
                             "font-weight:600;letter-spacing:.5px'>MAPA DE PROBABILIDADES</div>",
                             unsafe_allow_html=True,
                         )
                         st.markdown(_heatmap_html(M_hm, p["local"], p["visitante"]),
                                     unsafe_allow_html=True)
 
-            # ── Columna 2 & 3: predicciones ─────────────────
+            # ── Columna 2 & 3: predicciones ───────────────
             if not ya:
                 # Distribución rápida con fuerzas base FIFA (sin IA, cálculo instantáneo)
                 _fb = st.session_state.get("fuerzas_bayes", {})
@@ -529,14 +542,14 @@ for fecha in sorted(por_fecha.keys()):
                 with c2:
                     _m1 = _o1q["marcador"]
                     st.markdown(
-                        f"<div class='pred-1' style='color:#9aa7b4'>{_m1[0]} – {_m1[1]}</div>"
+                        f"<div class='pred-1' style='color:#4a5a6b'>{_m1[0]} – {_m1[1]}</div>"
                         f"<div class='meta'>📊 Base FIFA · {_o1q['prob']*100:.1f}% · "
                         f"<span class='chip chip-pts'>{_o1q['pts_esperados']:.1f} pts esp.</span></div>",
                         unsafe_allow_html=True,
                     )
                 with c3:
                     _alerta = (
-                        "<div style='color:#ffd25a;font-weight:700;font-size:.8rem;"
+                        "<div style='color:#b8860b;font-weight:700;font-size:.8rem;"
                         "margin-top:4px'>⚠️ Riesgo empate alto</div>"
                         if _p_emp > 0.27 else ""
                     )
@@ -576,7 +589,7 @@ for fecha in sorted(por_fecha.keys()):
                         unsafe_allow_html=True,
                     )
 
-            # ── Columna 4: marcador real + puntos ─────────────
+            # ── Columna 4: marcador real + puntos ─────────
             with c4:
                 real = guardado.get("real")
                 if real:
@@ -590,7 +603,7 @@ for fecha in sorted(por_fecha.keys()):
                     )
                     if _es_eliminatoria(p) and rl == rv and not guardado.get("penaltis"):
                         st.markdown(
-                            "<div class='meta' style='color:#ffd25a;font-weight:600'>"
+                            "<div class='meta' style='color:#b8860b;font-weight:600'>"
                             "🥅 Empate — ¿quién avanzó por penales?</div>",
                             unsafe_allow_html=True,
                         )
@@ -624,7 +637,7 @@ for fecha in sorted(por_fecha.keys()):
                     if _fecha_p <= _hoy:
                         # Partido pasado — permitir ingreso manual
                         st.markdown(
-                            "<div class='meta' style='color:#ffd25a;font-weight:600'>"
+                            "<div class='meta' style='color:#b8860b;font-weight:600'>"
                             "📝 Ingresar resultado:</div>",
                             unsafe_allow_html=True,
                         )
@@ -666,7 +679,7 @@ for fecha in sorted(por_fecha.keys()):
                         st.markdown("<div class='real-pend'>⏳ pendiente</div>",
                                     unsafe_allow_html=True)
 
-        st.markdown("<hr style='border:0;border-top:1px solid #1e2a38;margin:4px 0'>",
+        st.markdown("<hr style='border:0;border-top:1px solid #e2e8f0;margin:4px 0'>",
                     unsafe_allow_html=True)
 
 

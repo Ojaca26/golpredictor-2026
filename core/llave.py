@@ -26,26 +26,26 @@ BRACKET_RIGHT = [(84, 87), (83, 86), (82, 85), (81, 88)]
 _CSS = """
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0f1419;color:#eef2f6;font-family:Arial,sans-serif;padding:12px;overflow-x:auto}
-h2{text-align:center;color:#3ddc84;letter-spacing:2px;font-size:1rem;margin-bottom:16px;text-transform:uppercase}
+body{background:#ffffff;color:#0d2b52;font-family:Arial,sans-serif;padding:12px;overflow-x:auto}
+h2{text-align:center;color:#0d2b52;letter-spacing:2px;font-size:1rem;margin-bottom:16px;text-transform:uppercase}
 .bracket{display:flex;align-items:center;justify-content:center;gap:0;min-width:1100px}
 .half{display:flex;align-items:center;gap:0}
 .round-col{display:flex;flex-direction:column;align-items:center}
-.round-label{color:#5a6776;font-size:.6rem;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;text-align:center}
-.match{background:#0e1c2a;border:1px solid #1e2a38;border-radius:5px;padding:5px 8px;min-width:130px;max-width:150px;margin:3px 0;cursor:default}
-.match:hover{border-color:#2a3a50}
-.team{display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:.72rem;color:#9aa7b4}
-.team.win{color:#3ddc84;font-weight:700}
+.round-label{color:#8a97a6;font-size:.6rem;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;text-align:center}
+.match{background:#f5f8fc;border:1px solid #dbe6f2;border-radius:5px;padding:5px 8px;min-width:130px;max-width:150px;margin:3px 0;cursor:default}
+.match:hover{border-color:#b8d4f0}
+.team{display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:.72rem;color:#4a5a6b}
+.team.win{color:#0d2b52;font-weight:700}
 .team .tname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px}
-.team .tpct{font-size:.6rem;color:#5a6776;margin-left:4px}
-.divider{border-top:1px solid #1e2a38;border-bottom:1px solid #1e2a38;margin:2px 0;padding:2px 0;text-align:center;font-size:.7rem}
-.pred-sc{color:#7d8a99}
-.real-sc{color:#ffd25a;font-weight:700;margin-left:4px}
+.team .tpct{font-size:.6rem;color:#8a97a6;margin-left:4px}
+.divider{border-top:1px solid #dbe6f2;border-bottom:1px solid #dbe6f2;margin:2px 0;padding:2px 0;text-align:center;font-size:.7rem}
+.pred-sc{color:#5a6b7d}
+.real-sc{color:#b8860b;font-weight:700;margin-left:4px}
 .final-col{display:flex;flex-direction:column;align-items:center;margin:0 8px}
-.final-label{color:#3ddc84;font-size:.65rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
-.final-box{background:#13361f;border:1.5px solid #3ddc84;border-radius:6px;padding:6px 10px;min-width:140px;text-align:center}
+.final-label{color:#0d2b52;font-size:.65rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+.final-box{background:#e3edf9;border:1.5px solid #1a4d8f;border-radius:6px;padding:6px 10px;min-width:140px;text-align:center}
 .cup{font-size:1.5rem;text-align:center;margin-bottom:4px}
-.tbd{color:#3a4a5a;font-style:italic;font-size:.7rem}
+.tbd{color:#a0abb8;font-style:italic;font-size:.7rem}
 </style>
 """
 
@@ -71,7 +71,7 @@ def _match_box(t1, t2, pred, p1, p2, real, winner, penaltis=None):
     t2_cls = "team win" if winner == t2 else "team"
     pred_html = "<span class='pred-sc'>" + str(pred[0]) + "–" + str(pred[1]) + "</span>"
     if real:
-        pen_lbl = " <span style='color:#6ab4ff;font-size:.6rem'>(pen.)</span>" if penaltis else ""
+        pen_lbl = " <span style='color:#1a4d8f;font-size:.6rem'>(pen.)</span>" if penaltis else ""
         real_html = "<span class='real-sc'>(" + str(real[0]) + "–" + str(real[1]) + ")</span>" + pen_lbl
     else:
         real_html = ""
@@ -168,9 +168,9 @@ def generar_html_llave(r32_partidos, get_almacen_result, get_pred):
         + "<div class='final-label'>\U0001f3c6 Final</div>"
         + "<div class='final-box'>"
         + "<div class='cup'>\U0001f3c6</div>"
-        + "<div style='color:#3ddc84;font-weight:700;font-size:.8rem;margin-bottom:4px'>" + win_f + "</div>"
-        + "<div style='color:#7d8a99;font-size:.7rem'>" + final_t1 + " vs " + final_t2 + "</div>"
-        + "<div style='color:#9aa7b4;font-size:.65rem;margin-top:2px'>pred: " + pred_f + "</div>"
+        + "<div style='color:#0d2b52;font-weight:700;font-size:.8rem;margin-bottom:4px'>" + win_f + "</div>"
+        + "<div style='color:#5a6b7d;font-size:.7rem'>" + final_t1 + " vs " + final_t2 + "</div>"
+        + "<div style='color:#4a5a6b;font-size:.65rem;margin-top:2px'>pred: " + pred_f + "</div>"
         + "</div></div>"
     )
 
