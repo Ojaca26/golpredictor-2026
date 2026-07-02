@@ -152,7 +152,7 @@ except Exception as e:
 
 predictor = PoissonPredictor()
 
-# ── Fuerzas Bayesianas ──────────────────────────────────────────────────────
+# ── Fuerzas Bayesianas ────────────────────────────────────────────────────────
 # Se recalculan una vez por sesión y se invalidan cuando entra un resultado nuevo.
 if "fuerzas_bayes" not in st.session_state:
     _res_bayes = almacen.get_resultados_para_bayes(partidos)
@@ -291,9 +291,10 @@ with st.expander("🎲 Simulacion Monte Carlo del torneo", expanded=True):
         if run_mc:
             with st.spinner(f"Simulando {n_sims:,} torneos..."):
                 _res_reales = almacen.get_todos_resultados()
+                _pen_reales = almacen.get_todos_penaltis()
                 _fb_mc      = st.session_state.get("fuerzas_bayes") or None
                 st.session_state["mc_result"] = simular_torneo(
-                    partidos, n_sims, _res_reales, _fb_mc
+                    partidos, n_sims, _res_reales, _fb_mc, _pen_reales
                 )
                 st.session_state["mc_n"]      = n_sims
                 st.session_state["mc_fijos"]  = len(_res_reales)
@@ -409,8 +410,16 @@ with st.expander("🏆 Llave del torneo — 1/16 a Final", expanded=True):
                 p1  = round(pred.prob_victoria_local * 100)
                 p2  = round(pred.prob_victoria_visit * 100)
                 winner = local if pm[0] > pm[1] else visitante
-            except Exception:
-                pm, p1, p2, winner = [1, 1], 50, 50, local
+            except Exception as e:
+                # Fallback SIN esconder el problema: si el motor Poisson falla
+                # para este cruce, usamos la fuerza cruda (ataque/defensa) para
+                # decidir un ganador razonable en vez de asumir siempre "local".
+                st.session_state.setdefault("_errores_llave", []).append(
+                    f"{local} vs {visitante}: {e}"
+                )
+                ventaja_local = (_fl.ataque / _fv.defensa) - (_fv.ataque / _fl.defensa)
+                winner = local if ventaja_local >= 0 else visitante
+                pm, p1, p2 = [1, 1], 50, 50
             return pm, p1, p2, winner
 
         _html_llave = generar_html_llave(
@@ -419,6 +428,11 @@ with st.expander("🏆 Llave del torneo — 1/16 a Final", expanded=True):
             _get_pred_llave,
         )
         stc.html(_html_llave, height=680, scrolling=True)
+
+        if st.session_state.get("_errores_llave"):
+            with st.expander("⚠️ Cruces con error en el motor de predicción", expanded=False):
+                for msg in st.session_state["_errores_llave"]:
+                    st.markdown(f"<span class='meta'>{msg}</span>", unsafe_allow_html=True)
 
 st.markdown("---")
 st.markdown(f"<span class='meta'>Mostrando {len(partidos)} partidos · "
@@ -436,7 +450,7 @@ for fecha in sorted(por_fecha.keys()):
         with st.container():
             c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
 
-            # ── Columna 1: equipos + análisis base ──────────────────────
+            # ── Columna 1: equipos + análisis base ─────────────────
             with c1:
                 grupo = f" · Grupo {p['grupo']}" if p.get("grupo") else ""
                 sede  = f" · {p['sede']}"         if p.get("sede")  else ""
@@ -499,7 +513,7 @@ for fecha in sorted(por_fecha.keys()):
                         st.markdown(_heatmap_html(M_hm, p["local"], p["visitante"]),
                                     unsafe_allow_html=True)
 
-            # ── Columna 2 & 3: predicciones ─────────────────────────────
+            # ── Columna 2 & 3: predicciones ─────────────────
             if not ya:
                 # Distribución rápida con fuerzas base FIFA (sin IA, cálculo instantáneo)
                 _fb = st.session_state.get("fuerzas_bayes", {})
@@ -562,7 +576,7 @@ for fecha in sorted(por_fecha.keys()):
                         unsafe_allow_html=True,
                     )
 
-            # ── Columna 4: marcador real + puntos ───────────────────────
+            # ── Columna 4: marcador real + puntos ─────────────
             with c4:
                 real = guardado.get("real")
                 if real:
@@ -574,6 +588,21 @@ for fecha in sorted(por_fecha.keys()):
                         f"<div class='meta'>{etiqueta}</div>",
                         unsafe_allow_html=True,
                     )
+                    if _es_eliminatoria(p) and rl == rv and not guardado.get("penaltis"):
+                        st.markdown(
+                            "<div class='meta' style='color:#ffd25a;font-weight:600'>"
+                            "🥅 Empate — ¿quién avanzó por penales?</div>",
+                            unsafe_allow_html=True,
+                        )
+                        _cp1, _cp2 = st.columns(2)
+                        if _cp1.button(f"{p['local'][:10]}", key=f"pen_l_{p['id']}"):
+                            almacen.set_penal(p["id"], "local")
+                            st.cache_data.clear()
+                            st.rerun()
+                        if _cp2.button(f"{p['visitante'][:10]}", key=f"pen_v_{p['id']}"):
+                            almacen.set_penal(p["id"], "visitante")
+                            st.cache_data.clear()
+                            st.rerun()
                     if ya:
                         an = analizar_resultado(
                             st.session_state[f"pred_{p['id']}"]["opcion_1"]["marcador"],
