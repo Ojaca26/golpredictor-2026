@@ -74,5 +74,6 @@
   "79": {"real": [2, 0], "manual": true},
   "80": {"real": [2, 1], "manual": true},
   "83": {"real": [3, 0], "manual": true},
-  "84": {"real": [2, 1], "manual": true}
+  "84": {"real": [2, 1], "manual": true},
+  "85": {"real": [2, 0], "manual": true}
 }
