@@ -73,7 +73,17 @@
   "78": {"real": [3, 0], "manual": true},
   "79": {"real": [2, 0], "manual": true},
   "80": {"real": [2, 1], "manual": true},
+  "81": {"real": [3, 2], "manual": true},
+  "82": {"real": [2, 0], "manual": true},
   "83": {"real": [3, 0], "manual": true},
   "84": {"real": [2, 1], "manual": true},
-  "85": {"real": [2, 0], "manual": true}
+  "85": {"real": [2, 0], "manual": true},
+  "86": {"real": [1, 1], "manual": true, "penaltis": "visitante"},
+  "87": {"real": [3, 2], "manual": true},
+  "88": {"real": [1, 0], "manual": true},
+  "r16_l0": {"real": [0, 1], "manual": true},
+  "r16_l1": {"real": [0, 3], "manual": true},
+  "r16_l2": {"real": [1, 2], "manual": true},
+  "r16_l3": {"real": [2, 3], "manual": true},
+  "r16_r0": {"real": [0, 1], "manual": true}
 }
