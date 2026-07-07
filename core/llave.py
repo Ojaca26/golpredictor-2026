@@ -16,16 +16,16 @@ from typing import Dict, List, Optional, Tuple
 # ---------------------------------------------------------------------------
 #   Izquierda                   Derecha
 #   75 vs 78 → R16-A (r16_l0)   84 vs 83 → R16-E (r16_r0)
-#   73 vs 76 → R16-B (r16_l1)   86 vs 85 → R16-F (r16_r1)
-#   74 vs 77 → R16-C (r16_l2)   87 vs 88 → R16-G (r16_r2)
-#   79 vs 80 → R16-D (r16_l3)   81 vs 82 → R16-H (r16_r3)
+#   73 vs 76 → R16-B (r16_l1)   82 vs 81 → R16-F (r16_r1)
+#   74 vs 77 → R16-C (r16_l2)   87 vs 86 → R16-G (r16_r2)
+#   79 vs 80 → R16-D (r16_l3)   85 vs 88 → R16-H (r16_r3)
 #   R16-A vs R16-B → QF-1       R16-E vs R16-F → QF-3
 #   R16-C vs R16-D → QF-2       R16-G vs R16-H → QF-4
 #   QF-1 vs QF-2 → SF-IZQ      QF-3 vs QF-4 → SF-DER
 #   SF-IZQ vs SF-DER → FINAL
 
 BRACKET_LEFT  = [(75, 78), (73, 76), (74, 77), (79, 80)]
-BRACKET_RIGHT = [(84, 83), (86, 85), (87, 88), (81, 82)]
+BRACKET_RIGHT = [(84, 83), (82, 81), (87, 86), (85, 88)]
 
 
 # ---------------------------------------------------------------------------
