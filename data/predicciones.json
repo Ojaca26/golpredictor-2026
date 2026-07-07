@@ -85,5 +85,6 @@
   "r16_l1": {"real": [0, 3], "manual": true},
   "r16_l2": {"real": [1, 2], "manual": true},
   "r16_l3": {"real": [2, 3], "manual": true},
-  "r16_r0": {"real": [0, 1], "manual": true}
+  "r16_r0": {"real": [0, 1], "manual": true},
+  "r16_r1": {"real": [1, 4], "manual": true}
 }
