@@ -86,5 +86,7 @@
   "r16_l2": {"real": [1, 2], "manual": true},
   "r16_l3": {"real": [2, 3], "manual": true},
   "r16_r0": {"real": [0, 1], "manual": true},
-  "r16_r1": {"real": [1, 4], "manual": true}
+  "r16_r1": {"real": [1, 4], "manual": true},
+  "r16_r2": {"real": [3, 2], "manual": true},
+  "r16_r3": {"real": [0, 0], "manual": true, "penaltis": "local"}
 }
